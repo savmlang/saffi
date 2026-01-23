@@ -9,6 +9,8 @@ env:
 
 jobs:
   fulltest:
+    name: Full Cargo Test
+
     strategy:
       fail-fast: true
       matrix:
@@ -23,7 +25,7 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
 
-          - os: ubuntu-latest-arm
+          - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
 
           - os: macos-latest
@@ -62,4 +64,4 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain }}
           targets: ${{ matrix.triple.target }}
-          components: clippy
+          components: clippy, miri
