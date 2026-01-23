@@ -52,3 +52,14 @@ jobs:
         #     target: aarch64-apple-darwin
 
     runs-on: ${{ matrix.triple.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          targets: ${{ matrix.triple.target }}
+          components: clippy
