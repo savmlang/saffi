@@ -4,11 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ahash = "^0.8"
-hashbrown = "^0.16"
-pastey = "^0.2"
-
-dashmap = "^6"
-
 salloc = { path = "../salloc" }
 tokio = { version = "^1", features = ["rt", "sync", "time"] }

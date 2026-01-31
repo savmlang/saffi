@@ -4,10 +4,8 @@ use core::ffi::c_void;
 
 pub mod arc;
 pub mod boxed;
-pub mod ctr;
 pub mod futures;
 pub mod string;
-pub mod structures;
 pub mod vector;
 
 pub unsafe trait FFISafe {}
