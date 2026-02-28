@@ -1,196 +1,145 @@
-use core::{
+use std::{
   ffi::c_void,
-  marker::PhantomData,
+  mem::{forget, offset_of},
   ops::{Deref, DerefMut},
-  ptr,
+  ptr::{self, NonNull},
 };
-
-pub mod spawn;
 
 use crate::FFISafe;
 
+pub mod spawn;
+
 #[repr(C)]
-pub struct RTSafeBoxWrapper {
-  _data: *mut c_void,
+pub struct RTBoxWrapper<T: FFISafe + Sized> {
   _free: unsafe extern "C" fn(data: *mut c_void),
+  _t: T,
 }
 
-unsafe extern "C" fn mfree<T>(data: *mut c_void) {
-  unsafe {
-    ptr::drop_in_place(data as *mut T);
-    salloc::aligned_free(data);
-  }
+/// Returns the offset of T within RTBoxWrapper<T>.
+/// This is guaranteed to be correct regardless of padding.
+pub const fn rt_t_offset<T: FFISafe>() -> usize {
+  offset_of!(RTBoxWrapper<T>, _t)
 }
 
-impl RTSafeBoxWrapper {
-  pub fn new<T: FFISafe>(data: T) -> RTBox<T> {
-    RTBox {
-      _wrap: unsafe { Self::new_raw(data) },
-      _data: PhantomData,
-      poisoned: false,
-    }
-  }
+/// Negative offset from T back to the Header:
+pub const fn rt_header_offset<T: FFISafe>() -> isize {
+  -(rt_t_offset::<T>() as isize)
+}
 
-  pub unsafe fn new_raw<T: FFISafe>(data: T) -> *mut RTSafeBoxWrapper {
+pub struct RTBox<T: FFISafe + Sized> {
+  ptr: NonNull<T>,
+}
+
+impl<T: FFISafe + Sized> RTBox<T> {
+  pub fn new(data: T) -> Option<Self> {
     unsafe {
-      let alignment = align_of::<T>();
+      // Use our own allocator
+      let out: *mut RTBoxWrapper<T> =
+        salloc::aligned_malloc(size_of::<RTBoxWrapper<T>>(), align_of::<RTBoxWrapper<T>>()) as _;
 
-      let _data = salloc::aligned_malloc(size_of::<T>(), alignment);
-
-      #[cfg(debug_assertions)]
-      if _data.is_null() {
-        panic!("Unable to construct");
+      if out.is_null() {
+        return None;
       }
 
-      ptr::write(_data as _, data);
+      ptr::write(
+        out,
+        RTBoxWrapper {
+          _free: mfree::<T>,
+          _t: data,
+        },
+      );
 
-      let structdata = Self {
-        _data: _data as _,
-        _free: mfree::<T>,
-      };
-
-      let structdata_ptr =
-        salloc::aligned_malloc(size_of::<Self>(), align_of::<Self>()) as *mut Self;
-
-      #[cfg(debug_assertions)]
-      if structdata_ptr.is_null() {
-        salloc::aligned_free(_data);
-        panic!("Unable to construct");
-      }
-
-      ptr::write(structdata_ptr, structdata);
-
-      structdata_ptr
+      Some(Self {
+        ptr: NonNull::new_unchecked(out.byte_add(rt_t_offset::<T>()) as _),
+      })
     }
   }
 
-  /// You, the developer is required to ensure that `T` is correct
-  /// This constructs a Wrapper Type that's not FFI-able
-  pub unsafe fn construct<T: FFISafe>(pointer: *mut RTSafeBoxWrapper) -> RTBox<T> {
-    debug_assert_eq!(pointer.is_null(), false);
+  pub fn into_raw(self) -> *mut T {
+    let ptr = self.ptr;
+    forget(self);
 
-    RTBox {
-      _wrap: pointer,
-      _data: PhantomData,
-      poisoned: false,
+    ptr.as_ptr()
+  }
+
+  pub unsafe fn as_ptr(&self) -> *const T {
+    self.ptr.as_ptr() as _
+  }
+
+  pub unsafe fn as_mut_ptr(&self) -> *mut T {
+    self.ptr.as_ptr()
+  }
+
+  #[inline(always)]
+  pub unsafe fn from_raw(data: *mut T) -> Option<Self> {
+    Some(Self {
+      ptr: NonNull::new(data)?,
+    })
+  }
+
+  /// This is only allowed by the version
+  /// the allocated the RTBox with RTBox::new
+  pub unsafe fn unbox(self) -> T {
+    let ptr = self.ptr;
+
+    let out = unsafe { ptr::read(ptr.as_ptr()) };
+
+    // Deallocate shim
+    unsafe {
+      let base_ptr = (self.ptr.as_ptr() as *mut u8).byte_offset(rt_header_offset::<T>());
+      salloc::aligned_free(base_ptr as _);
     }
+
+    forget(self);
+
+    out
   }
 }
 
-pub unsafe fn drop_rtbox(wrap: *mut RTSafeBoxWrapper) {
-  debug_assert_eq!(wrap.is_null(), false);
-  let boxed = unsafe { &*wrap };
-
-  unsafe {
-    (boxed._free)(boxed._data);
-    salloc::aligned_free(wrap as *mut c_void);
-  }
-}
-
-pub unsafe fn peek<T: Copy>(wrap: *const RTSafeBoxWrapper) -> T {
-  debug_assert_eq!(wrap.is_null(), false);
-  let boxed = unsafe { &*wrap };
-
-  *unsafe { &*(boxed._data as *const _ as *const T) }
-}
-
-pub unsafe fn reference<'a, T>(wrap: *const RTSafeBoxWrapper) -> &'a T {
-  debug_assert_eq!(wrap.is_null(), false);
-
-  unsafe { &*(&*wrap)._data.cast::<T>() }
-}
-
-pub unsafe fn reference_mut<'a, T>(wrap: *mut RTSafeBoxWrapper) -> &'a mut T {
-  debug_assert_eq!(wrap.is_null(), false);
-
-  unsafe { &mut *(&*wrap)._data.cast::<T>() }
-}
-
-pub struct ContainedRTBox {
-  pub _wrap: *mut RTSafeBoxWrapper,
-  drop: bool,
-}
-
-impl ContainedRTBox {
-  pub fn new(data: *mut RTSafeBoxWrapper) -> Self {
-    Self {
-      _wrap: data,
-      drop: true,
-    }
-  }
-
-  pub fn get_const(&self) -> *const c_void {
-    debug_assert_eq!(self._wrap.is_null(), false);
-
-    unsafe { (&*self._wrap)._data as _ }
-  }
-
-  pub fn into_raw(mut self) -> *mut RTSafeBoxWrapper {
-    self.drop = false;
-    self._wrap
-  }
-}
-
-impl Drop for ContainedRTBox {
-  fn drop(&mut self) {
-    if self.drop {
-      debug_assert_eq!(self._wrap.is_null(), false);
-      let boxed = unsafe { &*self._wrap };
-
-      unsafe {
-        (boxed._free)(boxed._data);
-        salloc::aligned_free(self._wrap as *mut c_void);
-      }
-    }
-  }
-}
-
-pub struct RTBox<T: FFISafe> {
-  _wrap: *mut RTSafeBoxWrapper,
-  _data: PhantomData<T>,
-  poisoned: bool,
-}
-
-unsafe impl<T: FFISafe> Send for RTBox<T> {}
-unsafe impl<T: FFISafe> Sync for RTBox<T> {}
-
-impl<T: FFISafe> RTBox<T> {
-  pub fn into_raw(mut self) -> *mut RTSafeBoxWrapper {
-    self.poisoned = true;
-
-    self._wrap
-  }
-}
-
-impl<T: FFISafe + Clone> RTBox<T> {
-  pub fn unwrap(self) -> T {
-    (&*self).clone()
-  }
-}
-
-impl<T: FFISafe> Deref for RTBox<T> {
+impl<T: FFISafe + Sized> Deref for RTBox<T> {
   type Target = T;
 
   fn deref(&self) -> &Self::Target {
-    unsafe { &*(*self._wrap)._data.cast::<T>() }
+    unsafe { &*self.as_ptr() }
   }
 }
 
-impl<T: FFISafe> DerefMut for RTBox<T> {
+impl<T: FFISafe + Sized> DerefMut for RTBox<T> {
   fn deref_mut(&mut self) -> &mut Self::Target {
-    unsafe { &mut *(*self._wrap)._data.cast::<T>() }
+    unsafe { &mut *self.as_mut_ptr() }
   }
 }
 
-impl<T: FFISafe> Drop for RTBox<T> {
-  fn drop(&mut self) {
-    if !self.poisoned {
-      let boxed = unsafe { &*self._wrap };
+unsafe extern "C" fn mfree<T: FFISafe>(data: *mut c_void) {
+  unsafe {
+    ptr::drop_in_place(data as *mut T);
 
-      unsafe {
-        (boxed._free)(boxed._data);
-        salloc::aligned_free(self._wrap as *mut c_void);
-      }
+    let base_ptr = (data as *mut u8).byte_offset(rt_header_offset::<T>());
+    salloc::aligned_free(base_ptr as _);
+  }
+}
+
+impl<T: FFISafe + Sized> Drop for RTBox<T> {
+  fn drop(&mut self) {
+    unsafe {
+      let header_ptr = self.ptr.as_ptr().byte_offset(rt_header_offset::<T>())
+        as *mut unsafe extern "C" fn(*mut c_void);
+
+      (*header_ptr)(self.ptr.as_ptr() as _);
     }
   }
+}
+
+pub unsafe fn drop_rtbox<T: FFISafe + Sized>(wrap: *mut T) {
+  debug_assert_eq!(wrap.is_null(), false);
+
+  unsafe {
+    drop(RTBox::from_raw(wrap));
+  }
+}
+
+pub unsafe fn peek<T: FFISafe + Copy>(wrap: *const T) -> T {
+  debug_assert_eq!(wrap.is_null(), false);
+
+  unsafe { *wrap }
 }

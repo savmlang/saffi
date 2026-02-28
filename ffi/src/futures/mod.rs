@@ -1,126 +1,202 @@
 use std::{
-    os::raw::c_void,
-    ptr::{self, null_mut},
-    task::{Poll, Waker},
+  cell::Cell,
+  hint::cold_path,
+  marker::PhantomData,
+  mem::transmute,
+  os::raw::c_void,
+  ptr::addr_of,
+  task::{Poll, Waker},
 };
 
-use crate::{
-    FFISafe,
-    boxed::{ContainedRTBox, RTBox, RTSafeBoxWrapper},
-};
+use crate::FFISafe;
 
+pub mod atomiccw;
 pub mod implements;
 
-#[repr(C)]
-pub struct FutureTask {
-    // We don't care about the state
-    pub _state: *mut c_void,
-    // We expect you to clear state here!
-    pub _collect: extern "C" fn(*mut c_void) -> *mut RTSafeBoxWrapper,
-    pub _waker: extern "C" fn(*mut c_void, *mut WakerData) -> (),
-    pub _ready: extern "C" fn(*mut c_void) -> bool,
-    pub _clean: extern "C" fn(*mut c_void) -> (),
-}
-
-unsafe impl FFISafe for FutureTask {}
+pub type State = *mut c_void;
 
 #[repr(C)]
-pub struct WakerData {
-    waker: *mut c_void,
-    call: extern "C" fn(*mut c_void),
-    drop: extern "C" fn(*mut c_void),
+pub enum CBReason {
+  /// It is expected to make NO asynchronous progress
+  /// during this stage as otherwise, it will make things messy
+  SealWakerVTable {
+    /// Please make sure to copy the data from here!!
+    vtable: *const WakerVTable,
+  },
+
+  PollCollect,
+  /// Function to call to wake it up
+  ///
+  /// ## Please Note
+  /// You must also correctly handle deallocation by using the provided methods above
+  /// to responsibly call the correct method
+  Waker {
+    waker: CWaker,
+  },
+
+  Abort,
+  Cleanup,
 }
 
-unsafe impl Send for WakerData {}
-unsafe impl Sync for WakerData {}
-
-pub struct FFIWaker {
-    _data: *mut WakerData,
+#[repr(C)]
+pub struct WakerVTable {
+  wake_and_free: extern "C" fn(CWaker),
+  wake_no_free: extern "C" fn(*const CWaker),
+  waker_clone: extern "C" fn(*const CWaker) -> CWaker,
+  free_waker: extern "C" fn(CWaker),
 }
 
-unsafe impl Send for FFIWaker {}
-unsafe impl Sync for FFIWaker {}
-
-impl FFIWaker {
-    pub fn use_waker(ptr: *mut WakerData) -> Self {
-        Self { _data: ptr }
-    }
-
-    pub fn call(&self) {
-        unsafe {
-            let data = &*(self._data);
-
-            (data.call)(data.waker);
-        }
-    }
+#[repr(C, align(0x8))]
+#[derive(Debug)]
+pub struct CWaker {
+  /// This stores a rust structure
+  _unknown: [u8; 16],
 }
 
-impl Drop for FFIWaker {
-    fn drop(&mut self) {
-        unsafe {
-            let data = &*self._data;
-
-            (data.drop)(data.waker);
-        }
+impl CWaker {
+  pub unsafe fn unsafe_bitcopy(&self) -> Self {
+    CWaker {
+      _unknown: self._unknown,
     }
+  }
 }
 
-extern "C" fn drop_waker(ptr: *mut c_void) {
-    unsafe {
-        _ = Box::from_raw(ptr as *mut Waker);
-    }
+pub struct CWakerInternal {
+  waker: Waker,
 }
 
-extern "C" fn wake(ptr: *mut c_void) {
-    unsafe {
-        let waker = Box::from_raw(ptr as *mut Waker);
+const _WAKER_OK1: () = assert!(align_of::<CWaker>() == align_of::<CWakerInternal>());
+const _WAKER_OK2: () = assert!(size_of::<CWaker>() == size_of::<CWakerInternal>());
+const _WAKER_OK3: () = assert!(size_of::<CWaker>() == 0x10);
+const _WAKER_OK4: () = assert!(align_of::<CWaker>() == 0x8);
 
-        waker.wake_by_ref();
-
-        _ = Box::into_raw(waker);
-    }
+extern "C" fn call_no_drop(data: *const CWaker) {
+  unsafe {
+    transmute::<&CWaker, &CWakerInternal>(&*data)
+      .waker
+      .wake_by_ref();
+  }
 }
 
-impl Future for RTBox<FutureTask> {
-    type Output = ContainedRTBox;
+extern "C" fn call_drop(data: CWaker) {
+  unsafe {
+    transmute::<CWaker, CWakerInternal>(data).waker.wake();
+  }
+}
 
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        unsafe {
-            let has_data = (self._ready)(self._state);
+extern "C" fn drop_cwaker(data: CWaker) {
+  unsafe {
+    drop(transmute::<CWaker, CWakerInternal>(data).waker);
+  }
+}
 
-            let val = if has_data {
-                (self._collect)(self._state)
-            } else {
-                null_mut::<RTSafeBoxWrapper>()
-            };
+extern "C" fn clone_waker(data: *const CWaker) -> CWaker {
+  unsafe { transmute(transmute::<&CWaker, &CWakerInternal>(&*data).waker.clone()) }
+}
 
-            if !has_data {
-                let waker = Box::into_raw(Box::new(cx.waker().clone())) as *mut c_void;
+#[repr(C)]
+pub enum MaybeData<T> {
+  None,
+  Some(T),
+}
 
-                let waker_struct = WakerData {
-                    call: wake,
-                    waker,
-                    drop: drop_waker,
-                };
+#[repr(C)]
+pub struct Result<T: FFISafe> {
+  flag: u8,
 
-                let alloc = salloc::aligned_malloc(size_of::<WakerData>(), align_of::<WakerData>())
-                    as *mut WakerData;
+  /// Case A:
+  /// If the flag is not 0
+  /// It means that Future had been collected before
+  ///
+  /// Case B:
+  /// If the flag is 0
+  /// It means the Future is pending completion
+  ///
+  /// For CaseB, a new waker is sent via channel
+  /// shortly
+  output: MaybeData<T>,
+}
 
-                if !alloc.is_null() {
-                    ptr::write(alloc, waker_struct);
+#[repr(C)]
+pub struct FutureTask<T: FFISafe> {
+  pub _state: State,
 
-                    (self._waker)(self._state, alloc);
-                }
+  /// This is the function you're supposed to correctly handle!
+  ///
+  /// Return NULL once it has been consumed & When data is not available
+  pub _cb: extern "C" fn(State, CBReason) -> Result<T>,
+}
 
-                return Poll::Pending;
-            }
+unsafe impl<T: FFISafe> FFISafe for FutureTask<T> {}
 
-            (self._clean)(self._state);
+static WAKER_VTABLE: WakerVTable = WakerVTable {
+  wake_and_free: call_drop,
+  wake_no_free: call_no_drop,
+  free_waker: drop_cwaker,
+  waker_clone: clone_waker,
+};
 
-            Poll::Ready(ContainedRTBox::new(val))
-        }
+pub struct FFIFuture<T: FFISafe + Sized> {
+  task: FutureTask<T>,
+  complete: Cell<bool>,
+  _output: PhantomData<T>,
+}
+
+impl<T: FFISafe + Sized> FFIFuture<T> {
+  pub fn new(task: FutureTask<T>) -> Self {
+    (task._cb)(
+      task._state,
+      CBReason::SealWakerVTable {
+        vtable: addr_of!(WAKER_VTABLE),
+      },
+    );
+
+    Self {
+      _output: PhantomData,
+      complete: Cell::new(false),
+      task,
     }
+  }
+}
+
+impl<T: FFISafe + Sized> Future for FFIFuture<T> {
+  type Output = T;
+
+  fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+    let out = (self.task._cb)(self.task._state, CBReason::PollCollect {});
+
+    if let MaybeData::Some(out) = out.output {
+      self.complete.set(true);
+
+      return Poll::Ready(out);
+    }
+
+    if out.flag != 0 {
+      panic!("[ERR] ASYNCHRONOUS GLITCHING AT CALLING FFI ASYNC FUNCTION");
+    }
+
+    (self.task._cb)(
+      self.task._state,
+      CBReason::Waker {
+        waker: unsafe {
+          transmute(CWakerInternal {
+            waker: cx.waker().clone(),
+          })
+        },
+      },
+    );
+
+    Poll::Pending
+  }
+}
+
+impl<T: FFISafe + Sized> Drop for FFIFuture<T> {
+  fn drop(&mut self) {
+    if self.complete.get() {
+      cold_path();
+      (self.task._cb)(self.task._state, CBReason::Cleanup);
+    } else {
+      (self.task._cb)(self.task._state, CBReason::Abort);
+    }
+  }
 }

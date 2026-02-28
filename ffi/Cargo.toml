@@ -5,4 +5,6 @@ edition = "2024"
 
 [dependencies]
 salloc = { path = "../salloc" }
-tokio = { version = "^1", features = ["rt", "sync", "time"] }
+tokio = { version = "^1", features = ["rt", "sync", "time", "macros"] }
+
+parking_lot = "^0.12"

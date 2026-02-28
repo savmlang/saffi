@@ -1,35 +1,28 @@
-use std::sync::mpsc::Sender;
+use std::{ffi::c_void, sync::mpsc::Sender};
 
-use crate::{
-  FFISafe,
-  boxed::{RTSafeBoxWrapper, drop_rtbox},
-};
+use crate::{FFISafe, boxed::drop_rtbox};
+
+#[repr(C)]
+pub struct SenderStructure;
 
 #[repr(C)]
 pub struct ThreadSpawnContext {
   // implicitly has some data
-  pub sender: *mut RTSafeBoxWrapper,
-  pub send: extern "C" fn(pt: *mut RTSafeBoxWrapper, data: *mut RTSafeBoxWrapper),
+  pub sender: *mut SenderStructure,
+  pub send: extern "C" fn(sender: *mut SenderStructure, data: *mut c_void),
 }
 
 unsafe impl FFISafe for ThreadSpawnContext {}
 
-#[repr(C)]
-pub struct SendWrapper(*mut RTSafeBoxWrapper);
+unsafe impl FFISafe for SenderStructure {}
 
-unsafe impl Send for SendWrapper {}
-unsafe impl Sync for SendWrapper {}
-unsafe impl FFISafe for SendWrapper {}
-
-unsafe impl<T: FFISafe> FFISafe for Sender<T> {}
-
-pub extern "C" fn send(pt: *mut RTSafeBoxWrapper, data: *mut RTSafeBoxWrapper) {
+pub extern "C" fn send(sender: *mut SenderStructure, data: *mut c_void) {
   unsafe {
-    let pt = RTSafeBoxWrapper::construct::<Sender<SendWrapper>>(pt);
+    debug_assert!(!sender.is_null());
 
-    _ = pt.send(SendWrapper(data));
+    let sender = &*(sender as *mut Sender<*mut c_void>);
 
-    pt.into_raw();
+    _ = sender.send(data);
   }
 }
 
