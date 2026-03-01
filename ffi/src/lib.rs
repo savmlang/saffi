@@ -34,3 +34,6 @@ ffisafe! {
 
 unsafe impl<T> FFISafe for *const T {}
 unsafe impl<T> FFISafe for *mut T {}
+
+#[cfg(test)]
+pub mod tests;

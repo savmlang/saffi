@@ -1,8 +1,8 @@
 use std::{
   ffi::c_void,
+  marker::PhantomPinned,
   mem::offset_of,
   pin::Pin,
-  ptr::null,
   task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
 };
 
@@ -16,10 +16,13 @@ struct FutureState<F: Future> {
   // Our high-speed, lock-free waker state (Inlined!)
   waker_atomic: AtomicFFICWaker,
 
-  // The actual task
-  future: Option<Pin<Box<F>>>,
   // The cached Rust Waker handle
   raw_waker: Option<Waker>,
+
+  // The actual task
+  future: Option<F>,
+
+  _pin: PhantomPinned,
 }
 
 const _SAFETY_2: () = assert!(offset_of!(FutureState<FFIFuture<u8>>, waker_atomic) == 0);
@@ -73,11 +76,11 @@ where
   F::Output: FFISafe,
 {
   FutureTask {
-    #[allow(invalid_value)]
     _state: Box::into_raw(Box::new(FutureState {
-      future: Some(Box::pin(fut)),
+      future: Some(fut),
       raw_waker: None,
-      waker_atomic: AtomicFFICWaker::new(null()),
+      waker_atomic: AtomicFFICWaker::new(),
+      _pin: PhantomPinned,
     })) as _,
     _cb: poll_future::<F>,
   }
@@ -107,33 +110,34 @@ where
       state.waker_atomic.update(waker);
     }
     CBReason::Cleanup | CBReason::Abort => unsafe {
-      _ = state.future.take();
-
       // The drop is auto handled by rust Waker's drop
       _ = state.raw_waker.take();
+      _ = state.future.take();
 
       if state.waker_atomic.dec() {
         drop(Box::from_raw(state as *mut FutureState<F>));
       }
     },
     CBReason::PollCollect => {
-      if let Some(x) = state.future.as_mut() {
-        let waker = unsafe { state.raw_waker.as_ref().unwrap_unchecked() };
-        let mut ctx = Context::from_waker(waker);
+      let waker = unsafe { state.raw_waker.as_ref().unwrap_unchecked() };
+      let mut ctx = Context::from_waker(waker);
 
-        match x.as_mut().poll(&mut ctx) {
-          Poll::Ready(x) => {
-            return Result {
-              flag: 0,
-              output: MaybeData::Some(x),
-            };
-          }
-          Poll::Pending => {
-            return Result {
-              flag: 0,
-              output: MaybeData::None,
-            };
-          }
+      debug_assert!(state.future.is_some());
+
+      let fut = unsafe { Pin::new_unchecked(state.future.as_mut().unwrap_unchecked()) };
+
+      match fut.poll(&mut ctx) {
+        Poll::Ready(x) => {
+          return Result {
+            flag: 0,
+            output: MaybeData::Some(x),
+          };
+        }
+        Poll::Pending => {
+          return Result {
+            flag: 0,
+            output: MaybeData::None,
+          };
         }
       }
     }

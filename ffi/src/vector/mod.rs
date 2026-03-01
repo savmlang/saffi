@@ -127,7 +127,6 @@ impl<T: FFISafe + Sized> Vector<T> {
       let new_block = unsafe {
         salloc::aligned_realloc(
           self.ptr.as_ptr().byte_offset(header_offset::<T>()) as _,
-          calc::<T>(NonZero::new_unchecked(cap)),
           calc::<T>(NonZero::new_unchecked(new_cap)),
           align_of::<VectorHeaderVTable<T>>().max(size_of::<*const c_void>()),
         )

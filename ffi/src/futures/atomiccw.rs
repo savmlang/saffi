@@ -4,7 +4,7 @@ use std::{
   sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::futures::{CWaker, WakerVTable};
+use crate::futures::{CWaker, WAKER_VTABLE, WakerVTable};
 
 pub(crate) struct AtomicFFICWaker {
   state: AtomicUsize, // [63: LOCKED] [62: NOTIFIED] [61: NEW] [0-60: REF COUNT]
@@ -13,12 +13,12 @@ pub(crate) struct AtomicFFICWaker {
 }
 
 impl AtomicFFICWaker {
-  pub fn new(vtable: *const WakerVTable) -> Self {
+  pub fn new() -> Self {
     unsafe {
       Self {
         data: UnsafeCell::new(zeroed()),
         state: AtomicUsize::new(0x2000000000000000 | 1),
-        vtable: &*vtable,
+        vtable: &WAKER_VTABLE,
       }
     }
   }

@@ -30,6 +30,8 @@ pub struct RTBox<T: FFISafe + Sized> {
   ptr: NonNull<T>,
 }
 
+unsafe impl<T: FFISafe> FFISafe for RTBox<T> {}
+
 impl<T: FFISafe + Sized> RTBox<T> {
   pub fn new(data: T) -> Option<Self> {
     unsafe {
