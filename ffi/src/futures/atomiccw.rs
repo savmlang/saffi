@@ -24,7 +24,7 @@ impl AtomicFFICWaker {
   }
 
   pub fn inc(&self) {
-    self.state.fetch_add(1, Ordering::AcqRel);
+    self.state.fetch_add(1, Ordering::Relaxed);
   }
 
   // This decrements the Waker and also, if
@@ -63,22 +63,45 @@ impl AtomicFFICWaker {
 
   #[inline(always)]
   pub fn wake(&self) {
-    // Step 1: Mark as notified.
-    // Single instruction. No branches yet.
-    let old = self.state.fetch_or(1 << 62, Ordering::AcqRel);
+    let mut current_state = self.state.load(Ordering::Relaxed);
 
-    // Step 2: Check the Lock bit.
-    // If 0, WE are the ones who must call the FFI.
-    if (old & ((1 << 63) | (1 << 61))) == 0 {
-      // Because it's not LOCKED, data is stable.
-      unsafe {
+    loop {
+      if current_state & (1 << 63) != 0 {
+        // Path A: Lock is held by `update()`. We try to delegate.
+        match self.state.compare_exchange_weak(
+          current_state,
+          current_state | (1 << 62), // Just set NOTIFIED
+          Ordering::Release,         // Release pushes the NOTIFIED bit to `update()`
+          Ordering::Relaxed,
+        ) {
+          Ok(_) => return,                             // Delegation successful! Walk away.
+          Err(new_state) => current_state = new_state, // State changed, retry!
+        }
+      } else {
+        // Path B: Lock is free. We try to grab it AND set NOTIFIED.
+        match self.state.compare_exchange_weak(
+          current_state,
+          current_state | (1 << 63) | (1 << 62),
+          Ordering::Acquire, // Acquire ensures we safely see `self.data`
+          Ordering::Relaxed,
+        ) {
+          Ok(_) => break,                              // Lock acquired! Exit loop to read data.
+          Err(new_state) => current_state = new_state, // State changed, retry!
+        }
+      }
+    }
+
+    // --- WE NOW HOLD THE LOCK (Bit 63 is 1) ---
+    // The `Acquire` from Path B guarantees `self.data` is completely visible and stable.
+
+    unsafe {
+      if current_state & (1 << 61) == 0 {
         let d = &*self.data.get();
-
         (self.vtable.wake_no_free)(d);
       }
     }
-    // If old & (1 << 63) != 0, we just walk away.
-    // The thread holding the lock WILL see the bit we just set.
+
+    self.state.fetch_and(!(1 << 63), Ordering::Release);
   }
 
   pub fn update(&self, new_data: CWaker) {

@@ -1,10 +1,11 @@
 use std::{
-  cell::Cell,
+  cell::UnsafeCell,
   hint::cold_path,
-  marker::PhantomData,
+  marker::PhantomPinned,
   mem::transmute,
+  ops::BitAnd,
   os::raw::c_void,
-  ptr::addr_of,
+  ptr::{addr_of, null},
   task::{Poll, Waker},
 };
 
@@ -136,10 +137,15 @@ static WAKER_VTABLE: WakerVTable = WakerVTable {
   waker_clone: clone_waker,
 };
 
+#[repr(C, align(64))]
 pub struct FFIFuture<T: FFISafe + Sized> {
   task: FutureTask<T>,
-  complete: Cell<bool>,
-  _output: PhantomData<T>,
+  flags: UnsafeCell<u8>,
+
+  last_waker_data: UnsafeCell<*const ()>,
+  last_waker_vtable: UnsafeCell<*const ()>,
+
+  _pin: std::marker::PhantomPinned,
 }
 
 impl<T: FFISafe + Sized> FFIFuture<T> {
@@ -152,9 +158,11 @@ impl<T: FFISafe + Sized> FFIFuture<T> {
     );
 
     Self {
-      _output: PhantomData,
-      complete: Cell::new(false),
+      last_waker_data: UnsafeCell::new(null()),
+      last_waker_vtable: UnsafeCell::new(null()),
+      flags: UnsafeCell::new(0),
       task,
+      _pin: PhantomPinned,
     }
   }
 }
@@ -163,10 +171,40 @@ impl<T: FFISafe + Sized> Future for FFIFuture<T> {
   type Output = T;
 
   fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+    let waker = cx.waker();
+
+    // 1. Extract the raw waker parts manually.
+    // A Waker is effectively: struct { data: *const (), vtable: *const () }
+    let (data_ptr, vtable_ptr) = (waker.data(), waker.vtable() as *const _ as *const ());
+
+    // 2. The "Fingerprint" Check
+    // This is essentially what will_wake does, but without the function call.
+    if unsafe { *self.last_waker_data.get() != data_ptr }
+      || unsafe { *self.last_waker_vtable.get() != vtable_ptr }
+    {
+      unsafe {
+        *self.last_waker_data.get() = data_ptr;
+        *self.last_waker_vtable.get() = vtable_ptr;
+      }
+
+      (self.task._cb)(
+        self.task._state,
+        CBReason::Waker {
+          waker: unsafe {
+            transmute(CWakerInternal {
+              waker: waker.clone(),
+            })
+          },
+        },
+      );
+    }
+
     let out = (self.task._cb)(self.task._state, CBReason::PollCollect {});
 
     if let MaybeData::Some(out) = out.output {
-      self.complete.set(true);
+      unsafe {
+        *self.flags.get() |= 1 << 2;
+      }
 
       return Poll::Ready(out);
     }
@@ -175,24 +213,13 @@ impl<T: FFISafe + Sized> Future for FFIFuture<T> {
       panic!("[ERR] ASYNCHRONOUS GLITCHING AT CALLING FFI ASYNC FUNCTION");
     }
 
-    (self.task._cb)(
-      self.task._state,
-      CBReason::Waker {
-        waker: unsafe {
-          transmute(CWakerInternal {
-            waker: cx.waker().clone(),
-          })
-        },
-      },
-    );
-
     Poll::Pending
   }
 }
 
 impl<T: FFISafe + Sized> Drop for FFIFuture<T> {
   fn drop(&mut self) {
-    if self.complete.get() {
+    if self.flags.get_mut().bitand(1 << 2) != 0 {
       cold_path();
       (self.task._cb)(self.task._state, CBReason::Cleanup);
     } else {

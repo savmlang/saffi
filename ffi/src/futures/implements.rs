@@ -1,5 +1,6 @@
 use std::{
   ffi::c_void,
+  mem::offset_of,
   pin::Pin,
   ptr::null,
   task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
@@ -7,7 +8,7 @@ use std::{
 
 use crate::{
   FFISafe,
-  futures::{CBReason, FutureTask, MaybeData, Result, atomiccw::AtomicFFICWaker},
+  futures::{CBReason, FFIFuture, FutureTask, MaybeData, Result, atomiccw::AtomicFFICWaker},
 };
 
 #[repr(C, align(64))]
@@ -20,6 +21,8 @@ struct FutureState<F: Future> {
   // The cached Rust Waker handle
   raw_waker: Option<Waker>,
 }
+
+const _SAFETY_2: () = assert!(offset_of!(FutureState<FFIFuture<u8>>, waker_atomic) == 0);
 
 impl<F: Future> FutureState<F> {
   const VTABLE: RawWakerVTable = RawWakerVTable::new(
