@@ -43,8 +43,8 @@ pub enum CBReason {
 #[repr(C)]
 pub struct WakerVTable {
   pub wake_and_free: extern "C" fn(CWaker),
-  pub wake_no_free: extern "C" fn(*const CWaker),
-  pub waker_clone: extern "C" fn(*const CWaker) -> CWaker,
+  pub wake_no_free: extern "C" fn(CWaker),
+  pub waker_clone: extern "C" fn(CWaker) -> CWaker,
   pub free_waker: extern "C" fn(CWaker),
 }
 
@@ -73,9 +73,9 @@ const _WAKER_OK2: () = assert!(size_of::<CWaker>() == size_of::<CWakerInternal>(
 const _WAKER_OK3: () = assert!(size_of::<CWaker>() == 0x10);
 const _WAKER_OK4: () = assert!(align_of::<CWaker>() == 0x8);
 
-extern "C" fn call_no_drop(data: *const CWaker) {
+extern "C" fn call_no_drop(data: CWaker) {
   unsafe {
-    let internal = data.cast::<CWakerInternal>();
+    let internal = addr_of!(data).cast::<CWakerInternal>();
     let waker_ptr = std::ptr::addr_of!((*internal).waker);
     (*waker_ptr).wake_by_ref();
   }
@@ -98,9 +98,9 @@ extern "C" fn drop_cwaker(data: CWaker) {
   }
 }
 
-extern "C" fn clone_waker(data: *const CWaker) -> CWaker {
+extern "C" fn clone_waker(data: CWaker) -> CWaker {
   unsafe {
-    let internal = data.cast::<CWakerInternal>();
+    let internal = addr_of!(data).cast::<CWakerInternal>();
     let waker = (*addr_of!((*internal).waker)).clone();
 
     let new_internal = ManuallyDrop::new(CWakerInternal { waker });

@@ -5,7 +5,7 @@ use core::{
   ptr,
 };
 use std::hint::cold_path;
-use std::mem::{MaybeUninit, needs_drop, offset_of};
+use std::mem::{MaybeUninit, forget, needs_drop, offset_of};
 use std::num::NonZero;
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
@@ -147,7 +147,7 @@ impl<T: FFISafe + Sized> Vector<T> {
   #[inline(always)]
   pub fn push(&mut self, value: T) {
     unsafe {
-      self.push_known(None, None, value);
+      self.push_aided(None, None, value);
     }
   }
 
@@ -156,7 +156,7 @@ impl<T: FFISafe + Sized> Vector<T> {
   /// you might mess up, you might not, or, even better - you might invite someone never known
   ///
   /// Be careful and explicit and only pass the known_* if you're absolutely-drabsolutely sure about it!
-  pub unsafe fn push_known(
+  pub unsafe fn push_aided(
     &mut self,
     known_len: Option<usize>,
     known_cap: Option<usize>,
@@ -183,12 +183,12 @@ impl<T: FFISafe + Sized> Vector<T> {
     I: IntoIterator<Item = T>,
   {
     unsafe {
-      self.extend_known(None, None, iter);
+      self.extend_aided(None, None, iter);
     }
   }
 
   #[inline(always)]
-  pub unsafe fn extend_known<I>(
+  pub unsafe fn extend_aided<I>(
     &mut self,
     known_len: Option<usize>,
     known_cap: Option<usize>,
@@ -212,45 +212,83 @@ impl<T: FFISafe + Sized> Vector<T> {
     // the compiler can optimize this loop into a single block move.
     while let Some(item) = iterator.next() {
       unsafe {
-        self.push_known(Some(len), known_cap, item);
+        self.push_aided(Some(len), known_cap, item);
       }
 
       len += 1;
     }
   }
 
-  // pub fn extend_array<const N: usize>(&mut self, value: [T; N]) {
-  //   self.allocate(unsafe { NonZeroUsize::new_unchecked(self.len + N) });
+  pub fn into_raw(self) -> *mut T {
+    let data = self.ptr.as_ptr();
+    forget(self);
 
-  //   unsafe {
-  //     let dst = self.ptr.add(self.len);
-  //     // Move the bits
-  //     ptr::copy_nonoverlapping(value.as_ptr(), dst, N);
-  //     self.len += N;
+    data
+  }
 
-  //     // CRITICAL: Prevent the stack-based clones from dropping!
-  //     // This is safe because we just took ownership and moved them.
-  //     forget(value);
-  //   }
-  // }
+  pub unsafe fn from_raw(ptr: NonNull<T>) -> Self {
+    Self { ptr }
+  }
 
-  // pub fn extend_from_slice(&mut self, value: &[T])
-  // where
-  //   T: Copy,
-  // {
-  //   self.allocate(unsafe { NonZeroUsize::new_unchecked(self.len + value.len()) });
+  pub fn extend_array<const N: usize>(&mut self, value: [T; N]) {
+    unsafe { self.extend_array_aided(None, None, value) };
+  }
 
-  //   unsafe {
-  //     let dst = self.ptr.add(self.len);
+  pub unsafe fn extend_array_aided<const N: usize>(
+    &mut self,
+    known_len: Option<usize>,
+    known_cap: Option<usize>,
+    value: [T; N],
+  ) {
+    let len = known_len.unwrap_or(self.len());
 
-  //     ptr::copy_nonoverlapping(value.as_ptr(), dst, value.len());
+    self.allocate(known_cap, unsafe { NonZeroUsize::new_unchecked(len + N) });
 
-  //     self.len += value.len();
-  //   }
-  // }
+    unsafe {
+      let dst = self.ptr.as_ptr().add(len);
+      // Move the bits
+      ptr::copy_nonoverlapping(value.as_ptr(), dst, N);
+
+      self.set_len(len + N);
+
+      // CRITICAL: Prevent the stack-based clones from dropping!
+      // This is safe because we just took ownership and moved them.
+      forget(value);
+    }
+  }
+
+  pub fn extend_from_slice(&mut self, value: &[T])
+  where
+    T: Copy,
+  {
+    unsafe { self.extend_from_slice_aided(None, None, value) };
+  }
+
+  pub unsafe fn extend_from_slice_aided(
+    &mut self,
+    known_cap: Option<usize>,
+    known_len: Option<usize>,
+    value: &[T],
+  ) where
+    T: Copy,
+  {
+    let len = known_len.unwrap_or(self.len());
+
+    self.allocate(known_cap, unsafe {
+      NonZeroUsize::new_unchecked(len + value.len())
+    });
+
+    unsafe {
+      let dst = self.ptr.as_ptr().add(len);
+
+      ptr::copy_nonoverlapping(value.as_ptr(), dst, value.len());
+
+      self.set_len(len + value.len());
+    }
+  }
 
   #[inline(always)]
-  pub unsafe fn get_known(&self, known_len: Option<usize>, index: usize) -> Option<&T> {
+  pub unsafe fn get_aided(&self, known_len: Option<usize>, index: usize) -> Option<&T> {
     let len = known_len.unwrap_or(self.len());
 
     if index >= len {
@@ -261,7 +299,7 @@ impl<T: FFISafe + Sized> Vector<T> {
   }
 
   #[inline(always)]
-  pub unsafe fn get_mut_known(&mut self, known_len: Option<usize>, index: usize) -> Option<&mut T> {
+  pub unsafe fn get_mut_aided(&mut self, known_len: Option<usize>, index: usize) -> Option<&mut T> {
     let len = known_len.unwrap_or(self.len());
 
     if index >= len {
@@ -273,11 +311,11 @@ impl<T: FFISafe + Sized> Vector<T> {
 
   #[inline(always)]
   pub fn pop(&mut self) -> Option<T> {
-    unsafe { self.pop_known(None) }
+    unsafe { self.pop_aided(None) }
   }
 
   #[inline(always)]
-  pub unsafe fn pop_known(&mut self, known_len: Option<usize>) -> Option<T> {
+  pub unsafe fn pop_aided(&mut self, known_len: Option<usize>) -> Option<T> {
     let len = known_len.unwrap_or(self.len());
 
     if len == 0 {
@@ -302,7 +340,7 @@ impl<T: FFISafe + Sized> Index<usize> for Vector<T> {
 
   fn index(&self, index: usize) -> &Self::Output {
     unsafe {
-      let Some(out) = self.get_known(None, index) else {
+      let Some(out) = self.get_aided(None, index) else {
         cold_path();
 
         panic!(
@@ -320,7 +358,7 @@ impl<T: FFISafe + Sized> Index<usize> for Vector<T> {
 impl<T: FFISafe + Sized> IndexMut<usize> for Vector<T> {
   fn index_mut(&mut self, index: usize) -> &mut Self::Output {
     unsafe {
-      let Some(out) = self.get_mut_known(None, index) else {
+      let Some(out) = self.get_mut_aided(None, index) else {
         cold_path();
 
         panic!("index out of bounds: the index {} is out of bounds", index);

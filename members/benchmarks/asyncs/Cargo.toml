@@ -1,0 +1,12 @@
+[package]
+name = "asyncs"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "asyncfn"
+crate-type = ["cdylib"]
+
+[dependencies]
+saffi = { path = "../../../ffi" }
+smol = "2.0.2"

@@ -2,7 +2,6 @@
 
 use core::ffi::c_void;
 
-pub mod arc;
 pub mod boxed;
 pub mod futures;
 pub mod string;

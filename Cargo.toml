@@ -1,0 +1,14 @@
+[workspace]
+resolver = "3"
+members = ["members/loomtests", "members/benchmarks", "cshim", "members/benchmarks/asyncs"]
+exclude = ["ffi", "salloc"]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+opt-level = "z"   # Optimize for size
+lto = true        # Link Time Optimization (huge for stripping dead code)
+codegen-units = 1 # Better optimization at the cost of compile time
+panic = "abort"   # No unwinding logic
+strip = true

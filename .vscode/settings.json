@@ -1,3 +1,7 @@
 {
-  "rust-analyzer.cargo.cfgs": ["debug_assertions", "miri", "loom"]
+  "rust-analyzer.linkedProjects": [
+    "./Cargo.toml",
+    "./cshim/Cargo.toml",
+    "./members/benchmarks/asyncs/Cargo.toml"
+  ]
 }
