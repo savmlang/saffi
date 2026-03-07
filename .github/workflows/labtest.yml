@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions: 
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -20,8 +23,7 @@ jobs:
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ matrix.toolchain }}
-          targets: ${{ matrix.triple.target }}
+          toolchain: nightly
 
       - name: Loom tests
         working-directory: members/loomtests
