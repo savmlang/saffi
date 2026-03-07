@@ -8,8 +8,28 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  fulltest:
-    name: Full Cargo Test
+  loom:
+    name: Loom tests
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          targets: ${{ matrix.triple.target }}
+
+      - name: Loom tests
+        working-directory: members/loomtests
+        run: |
+          cargo test
+    
+  benchmarks:
+    name: Benchmarks
 
     strategy:
       fail-fast: true
@@ -45,4 +65,8 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain }}
           targets: ${{ matrix.triple.target }}
-          components: clippy, miri
+      
+      - name: Run benchmarks
+        working-directory: members/loomtests
+        run: |
+          cargo bench
