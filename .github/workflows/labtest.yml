@@ -69,6 +69,6 @@ jobs:
           targets: ${{ matrix.triple.target }}
       
       - name: Run benchmarks
-        working-directory: members/loomtests
+        working-directory: members/benchmarks
         run: |
           cargo bench
