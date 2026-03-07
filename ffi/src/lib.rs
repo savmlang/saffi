@@ -1,5 +1,3 @@
-#![feature(type_alias_impl_trait, cold_path)]
-
 use core::ffi::c_void;
 
 pub mod boxed;
