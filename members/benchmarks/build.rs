@@ -10,24 +10,10 @@ fn main() {
 
   let mut rt = project_root.clone();
   rt.push("cache");
+  rt.push("benchmarks");
   let common_targets = rt.to_str().expect("Unable to build deps");
 
-  // Build SaAlloc at project root
-  if !Command::new("cargo")
-    .arg("build")
-    .arg("--release")
-    .arg("-p")
-    .arg("salloc")
-    .current_dir(&project_root)
-    .env("CARGO_TARGET_DIR", common_targets)
-    .spawn()
-    .expect("Unable to launch cargo build for SaAlloc")
-    .wait()
-    .expect("Unable to compile SaAlloc")
-    .success()
-  {
-    panic!("Building SaAlloc failed")
-  }
+  // SaAlloc is already built by asyncs!
 
   // Build asyncs
   if !Command::new("cargo")
@@ -51,6 +37,16 @@ fn main() {
   );
   println!(
     "cargo:rustc-link-search=native={}/target/debug",
+    common_targets
+  );
+
+  // Point to salloc build by asyncs
+  println!(
+    "cargo:rustc-link-search=native={}/../asyncs/target/release",
+    common_targets
+  );
+  println!(
+    "cargo:rustc-link-search=native={}/../asyncs/target/debug",
     common_targets
   );
 }

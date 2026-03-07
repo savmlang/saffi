@@ -7,6 +7,7 @@ fn main() {
 
   let mut rt = project_root.clone();
   rt.push("cache");
+  rt.push("asyncs");
   let common_targets = rt.to_str().expect("Unable to build deps");
 
   // Build SaAlloc at project root
