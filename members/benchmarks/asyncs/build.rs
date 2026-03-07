@@ -1,12 +1,9 @@
-use std::{path::PathBuf, process::Command};
+use std::{env, path::PathBuf, process::Command};
 
 fn main() {
-  let mut project_root = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+  let mut project_root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 
-  let mut asyncs = project_root.clone();
-  asyncs.push("asyncs");
-
-  project_root.push("../..");
+  project_root.push("../../..");
 
   let mut rt = project_root.clone();
   rt.push("cache");
@@ -27,21 +24,6 @@ fn main() {
     .success()
   {
     panic!("Building SaAlloc failed")
-  }
-
-  // Build asyncs
-  if !Command::new("cargo")
-    .arg("build")
-    .arg("--release")
-    .current_dir(&asyncs)
-    .env("CARGO_TARGET_DIR", common_targets)
-    .spawn()
-    .expect("Unable to launch cargo build for Asyncs")
-    .wait()
-    .expect("Unable to compile Asyncs")
-    .success()
-  {
-    panic!("Building Asyncs failed");
   }
 
   // Point to the workspace target directory where the dylib files are generated
