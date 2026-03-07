@@ -1,0 +1,25 @@
+[package]
+name = "salloc"
+version = "0.0.0"                                                            # This does not define the version
+edition = "2024"
+description = "Packaged allocator to be used in the Sa Programming Language"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+libmimalloc-sys = { version = "0.1", features = [
+  "v3",
+  "arena",
+], default-features = false }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+opt-level = "z"   # Optimize for size
+lto = true        # Link Time Optimization (huge for stripping dead code)
+codegen-units = 1 # Better optimization at the cost of compile time
+panic = "abort"   # No unwinding logic
+strip = true

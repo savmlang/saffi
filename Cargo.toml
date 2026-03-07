@@ -1,10 +1,11 @@
 [workspace]
 resolver = "3"
-members = ["members/loomtests", "members/benchmarks", "cshim", "members/benchmarks/asyncs"]
-exclude = ["ffi", "salloc"]
-
-[profile.dev]
-panic = "abort"
+members = [
+  "members/loomtests",
+  "members/benchmarks",
+  "members/benchmarks/asyncs",
+]
+exclude = ["ffi", "salloc", "libsalloc"]
 
 [profile.release]
 opt-level = "z"   # Optimize for size

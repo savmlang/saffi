@@ -1,0 +1,24 @@
+name: salloc
+
+arch: ${ARCH}
+
+platform: linux
+
+version: ${VERSION}
+
+version_schema: semver
+
+vendor: The Sa VM Programming Language
+
+maintainer: Akshanabha Chakraborty <ahqsecret@gmail.com>
+
+description: The Allocator used by the Sa Programming Language VM and others. This is an always backwards compatible allocator
+
+homepage: https://savmlang.github.io
+
+license: Apache-2.0
+
+contents:
+  - src: ../allocator/target/${TARGET}/libsalloc.so
+    dst: /usr/lib/
+    expand: true
