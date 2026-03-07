@@ -25,6 +25,8 @@ pub unsafe extern "C" fn aligned_realloc(
   unsafe { mi_realloc_aligned(ptr, size, align) }
 }
 
+#[cfg(target_os = "macos")]
+#[link(name = "System")]
 unsafe extern "C" {
   pub fn exit(status: c_int) -> !;
 }
