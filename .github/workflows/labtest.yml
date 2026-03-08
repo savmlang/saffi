@@ -76,6 +76,8 @@ jobs:
       - name: Run benchmarks
         working-directory: members/benchmarks
         shell: pwsh
+        env:
+          LD_LIBRARY_PATH: ${{ github.workspace }}/cache/benchmarks/release:${{ github.workspace }}/libsalloc/allocator/target/release
         run: |
           $separator = [System.IO.Path]::PathSeparator
 
