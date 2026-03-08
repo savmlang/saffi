@@ -65,7 +65,8 @@ pub fn loom_atomic_waker_owned() {
 pub fn loom_atomic_waker_storm() {
   let mut builder = loom::model::Builder::new();
 
-  builder.max_permutations = Some(20_000);
+  builder.preemption_bound = Some(2);
+  builder.max_branches = Some(100_000);
 
   builder.check(|| {
     let store = Arc::new(SwappableCodeStore::new(10));

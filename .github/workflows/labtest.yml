@@ -28,7 +28,9 @@ jobs:
       - name: Loom tests
         working-directory: members/loomtests
         run: |
-          cargo test
+          cargo test -- --nocapture
+        env:
+          LOOM_LOG: 1
 
   benchmarks:
     name: Benchmarks
