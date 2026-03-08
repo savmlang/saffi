@@ -31,22 +31,11 @@ fn main() {
   }
 
   // Point to the workspace target directory where the dylib files are generated
-  println!(
-    "cargo:rustc-link-search=native={}/target/release",
-    common_targets
-  );
-  println!(
-    "cargo:rustc-link-search=native={}/target/debug",
-    common_targets
-  );
+  println!("cargo:rustc-link-search=native={}/release", common_targets);
 
   // Point to salloc build by asyncs
   println!(
     "cargo:rustc-link-search=native={}/../../libsalloc/allocator/target/release",
-    common_targets
-  );
-  println!(
-    "cargo:rustc-link-search=native={}/../../libsalloc/allocator/target/debug",
     common_targets
   );
 }

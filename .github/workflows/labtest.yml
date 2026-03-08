@@ -75,5 +75,10 @@ jobs:
 
       - name: Run benchmarks
         working-directory: members/benchmarks
+        shell: pwsh
         run: |
+          $separator = [System.IO.Path]::PathSeparator
+          $env:Path += "$separator" + "$(Resolve-Path ../../cache/benchmarks/release)"
+          $env:Path += "$separator" + "$(Resolve-Path ../../libsalloc/allocator/target/release)"
+
           cargo bench

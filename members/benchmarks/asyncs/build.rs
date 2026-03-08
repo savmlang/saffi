@@ -15,8 +15,4 @@ fn main() {
     "cargo:rustc-link-search=native={}/target/release",
     common_targets
   );
-  println!(
-    "cargo:rustc-link-search=native={}/target/debug",
-    common_targets
-  );
 }
