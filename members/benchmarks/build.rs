@@ -42,11 +42,11 @@ fn main() {
 
   // Point to salloc build by asyncs
   println!(
-    "cargo:rustc-link-search=native={}/../asyncs/target/release",
+    "cargo:rustc-link-search=native={}/../../libsalloc/allocator/target/release",
     common_targets
   );
   println!(
-    "cargo:rustc-link-search=native={}/../asyncs/target/debug",
+    "cargo:rustc-link-search=native={}/../../libsalloc/allocator/target/debug",
     common_targets
   );
 }

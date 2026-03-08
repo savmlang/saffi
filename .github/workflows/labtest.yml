@@ -4,7 +4,7 @@ on:
   push:
   pull_request:
 
-permissions: 
+permissions:
   contents: read
 
 env:
@@ -29,7 +29,7 @@ jobs:
         working-directory: members/loomtests
         run: |
           cargo test
-    
+
   benchmarks:
     name: Benchmarks
 
@@ -67,7 +67,12 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain }}
           targets: ${{ matrix.triple.target }}
-      
+
+      - name: Build salloc
+        working-directory: libsalloc/allocator
+        run: |
+          cargo build --release
+
       - name: Run benchmarks
         working-directory: members/benchmarks
         run: |
