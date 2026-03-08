@@ -78,6 +78,13 @@ jobs:
         shell: pwsh
         run: |
           $separator = [System.IO.Path]::PathSeparator
+
+          cd asyncs
+            $env:CARGO_TARGET_DIR = "../../../cache/benchmarks"
+
+            cargo build --release
+          cd ..
+
           $env:Path += "$separator" + "$(Resolve-Path ../../cache/benchmarks/release)"
           $env:Path += "$separator" + "$(Resolve-Path ../../libsalloc/allocator/target/release)"
 
