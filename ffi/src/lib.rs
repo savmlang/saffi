@@ -5,6 +5,8 @@ pub mod futures;
 pub mod string;
 pub mod vector;
 
+pub use salloc;
+
 pub unsafe trait FFISafe {}
 
 macro_rules! ffisafe {
