@@ -7,6 +7,8 @@ use core::ffi::c_void;
 unsafe extern "C" {
   pub unsafe fn aligned_malloc(size: usize, align: usize) -> *mut c_void;
 
+  pub unsafe fn aligned_zalloc(size: usize, align: usize) -> *mut c_void;
+
   pub unsafe fn aligned_realloc(ptr: *mut c_void, size: usize, align: usize) -> *mut c_void;
 
   pub unsafe fn aligned_free(ptr: *mut c_void);
