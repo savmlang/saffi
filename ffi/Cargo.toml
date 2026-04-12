@@ -5,5 +5,5 @@ edition = "2024"
 license = "Apache-2.0"
 
 [dependencies]
-salloc = { path = "../salloc" }
+salloc = { package = "salloc-sys", path = "../salloc" }
 tokio = { version = "^1", features = ["rt", "sync", "time", "macros"] }
