@@ -48,11 +48,20 @@ pub struct WakerVTable {
   pub free_waker: extern "C" fn(CWaker),
 }
 
+#[cfg(target_pointer_width = "64")]
 #[repr(C, align(0x8))]
 #[derive(Debug)]
 pub struct CWaker {
   /// This stores a rust structure
   _unknown: [u8; 16],
+}
+
+#[cfg(target_pointer_width = "32")]
+#[repr(C, align(0x4))]
+#[derive(Debug)]
+pub struct CWaker {
+  /// This stores a rust structure
+  _unknown: [u8; 8],
 }
 
 impl CWaker {
@@ -70,8 +79,16 @@ pub struct CWakerInternal {
 
 const _WAKER_OK1: () = assert!(align_of::<CWaker>() == align_of::<CWakerInternal>());
 const _WAKER_OK2: () = assert!(size_of::<CWaker>() == size_of::<CWakerInternal>());
+
+#[cfg(target_pointer_width = "64")]
 const _WAKER_OK3: () = assert!(size_of::<CWaker>() == 0x10);
+#[cfg(target_pointer_width = "64")]
 const _WAKER_OK4: () = assert!(align_of::<CWaker>() == 0x8);
+
+#[cfg(target_pointer_width = "32")]
+const _WAKER_OK3: () = assert!(size_of::<CWaker>() == 0x8);
+#[cfg(target_pointer_width = "32")]
+const _WAKER_OK4: () = assert!(align_of::<CWaker>() == 0x4);
 
 extern "C" fn call_no_drop(data: CWaker) {
   unsafe {
