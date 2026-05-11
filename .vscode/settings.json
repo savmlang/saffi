@@ -1,7 +1,3 @@
 {
-  "rust-analyzer.linkedProjects": [
-    "./Cargo.toml",
-    "./salloc/cshim/Cargo.toml",
-    "./members/benchmarks/asyncs/Cargo.toml"
-  ]
+  "rust-analyzer.linkedProjects": ["./Cargo.toml", "./ffi/Cargo.toml"]
 }

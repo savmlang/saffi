@@ -5,12 +5,15 @@ use std::{
   mem::ManuallyDrop,
   ops::BitAnd,
   os::raw::c_void,
-  ptr::{self, addr_of, addr_of_mut, null},
-  sync::atomic::{Ordering, compiler_fence},
-  task::{Poll, Waker},
+  ptr::addr_of,
+  sync::atomic::{AtomicUsize, Ordering},
+  task::{Poll, RawWakerVTable, Waker},
 };
 
-use crate::FFISafe;
+use crate::{
+  FFISafe,
+  I_DECLARE_THAT_I_AND_MY_CODEBASE_IS_FFI_SAFE_AND_THAT_UNDEFINED_BEHAVIOUR_ARISING_DUE_TO_DECLARING_MY_TYPES_FFI_SAFE_DOES_NOT_CONDONE_THE_SAFETY_AND_SECURITY_OF_THIS_PROJECT,
+};
 
 pub mod atomiccw;
 pub mod implements;
@@ -42,87 +45,59 @@ pub enum CBReason {
 
 #[repr(C)]
 pub struct WakerVTable {
-  pub wake_and_free: extern "C" fn(CWaker),
-  pub wake_no_free: extern "C" fn(CWaker),
-  pub waker_clone: extern "C" fn(CWaker) -> CWaker,
-  pub free_waker: extern "C" fn(CWaker),
+  pub wake_and_free: unsafe extern "C" fn(CWaker),
+  pub wake_no_free: unsafe extern "C" fn(CWaker),
+  pub waker_clone: unsafe extern "C" fn(CWaker) -> CWaker,
+  pub free_waker: unsafe extern "C" fn(CWaker),
 }
 
-#[cfg(target_pointer_width = "64")]
-#[repr(C, align(0x8))]
-#[derive(Debug)]
-pub struct CWaker {
-  /// This stores a rust structure
-  _unknown: [u8; 16],
-}
-
-#[cfg(target_pointer_width = "32")]
-#[repr(C, align(0x4))]
-#[derive(Debug)]
-pub struct CWaker {
-  /// This stores a rust structure
-  _unknown: [u8; 8],
-}
-
-impl CWaker {
-  pub unsafe fn unsafe_bitcopy(&self) -> Self {
-    CWaker {
-      _unknown: self._unknown,
-    }
-  }
-}
-
+#[derive(Debug, Clone, Copy)]
 #[repr(C)]
-pub struct CWakerInternal {
-  waker: Waker,
+pub struct CWaker {
+  data: *const (),
+  vtable: *const c_void,
 }
 
-const _WAKER_OK1: () = assert!(align_of::<CWaker>() == align_of::<CWakerInternal>());
-const _WAKER_OK2: () = assert!(size_of::<CWaker>() == size_of::<CWakerInternal>());
-
-#[cfg(target_pointer_width = "64")]
-const _WAKER_OK3: () = assert!(size_of::<CWaker>() == 0x10);
-#[cfg(target_pointer_width = "64")]
-const _WAKER_OK4: () = assert!(align_of::<CWaker>() == 0x8);
-
-#[cfg(target_pointer_width = "32")]
-const _WAKER_OK3: () = assert!(size_of::<CWaker>() == 0x8);
-#[cfg(target_pointer_width = "32")]
-const _WAKER_OK4: () = assert!(align_of::<CWaker>() == 0x4);
-
-extern "C" fn call_no_drop(data: CWaker) {
+extern "C" fn call_no_drop(waker: CWaker) {
   unsafe {
-    let internal = addr_of!(data).cast::<CWakerInternal>();
-    let waker_ptr = std::ptr::addr_of!((*internal).waker);
-    (*waker_ptr).wake_by_ref();
+    let waker = ManuallyDrop::new(Waker::new(
+      waker.data,
+      &*(waker.vtable as *const RawWakerVTable),
+    ));
+    waker.wake_by_ref();
   }
 }
 
-extern "C" fn call_drop(mut data: CWaker) {
+extern "C" fn call_drop(waker: CWaker) {
   unsafe {
-    let internal = addr_of_mut!(data).cast::<CWakerInternal>();
-    let waker_ptr = addr_of_mut!((*internal).waker);
+    let waker = Waker::new(waker.data, &*(waker.vtable as *const RawWakerVTable));
 
-    (*waker_ptr).wake_by_ref();
-    ptr::drop_in_place(waker_ptr);
+    waker.wake();
   }
 }
 
-extern "C" fn drop_cwaker(data: CWaker) {
+extern "C" fn drop_cwaker(waker: CWaker) {
   unsafe {
-    let waker_ptr = addr_of!(data._unknown) as *const Waker;
-    ptr::drop_in_place(waker_ptr as *mut Waker);
+    drop(Waker::new(
+      waker.data,
+      &*(waker.vtable as *const RawWakerVTable),
+    ));
   }
 }
 
-extern "C" fn clone_waker(data: CWaker) -> CWaker {
+extern "C" fn clone_waker(waker: CWaker) -> CWaker {
   unsafe {
-    let internal = addr_of!(data).cast::<CWakerInternal>();
-    let waker = (*addr_of!((*internal).waker)).clone();
+    let waker = ManuallyDrop::new(Waker::new(
+      waker.data,
+      &*(waker.vtable as *const RawWakerVTable),
+    ));
 
-    let new_internal = ManuallyDrop::new(CWakerInternal { waker });
+    let newwaker = ManuallyDrop::new(waker.clone());
 
-    ptr::read(addr_of!(new_internal) as *const _ as *const CWaker)
+    CWaker {
+      data: newwaker.data(),
+      vtable: newwaker.vtable() as *const _ as _,
+    }
   }
 }
 
@@ -159,7 +134,11 @@ pub struct FutureTask<T: FFISafe> {
   pub _cb: extern "C" fn(State, CBReason) -> Result<T>,
 }
 
-unsafe impl<T: FFISafe> FFISafe for FutureTask<T> {}
+unsafe impl<T: FFISafe> FFISafe for FutureTask<T> {
+  fn i_am_ffisafe() -> crate::IAmFFISafe {
+    I_DECLARE_THAT_I_AND_MY_CODEBASE_IS_FFI_SAFE_AND_THAT_UNDEFINED_BEHAVIOUR_ARISING_DUE_TO_DECLARING_MY_TYPES_FFI_SAFE_DOES_NOT_CONDONE_THE_SAFETY_AND_SECURITY_OF_THIS_PROJECT
+  }
+}
 
 static WAKER_VTABLE: WakerVTable = WakerVTable {
   wake_and_free: call_drop,
@@ -173,8 +152,8 @@ pub struct FFIFuture<T: FFISafe + Sized> {
   task: FutureTask<T>,
   flags: UnsafeCell<u8>,
 
-  last_waker_data: UnsafeCell<*const ()>,
-  last_waker_vtable: UnsafeCell<*const ()>,
+  last_waker_data: AtomicUsize,
+  last_waker_vtable: AtomicUsize,
 
   _pin: std::marker::PhantomPinned,
 }
@@ -189,8 +168,8 @@ impl<T: FFISafe + Sized> FFIFuture<T> {
     );
 
     Self {
-      last_waker_data: UnsafeCell::new(null()),
-      last_waker_vtable: UnsafeCell::new(null()),
+      last_waker_data: AtomicUsize::new(0),
+      last_waker_vtable: AtomicUsize::new(0),
       flags: UnsafeCell::new(0),
       task,
       _pin: PhantomPinned,
@@ -210,25 +189,29 @@ impl<T: FFISafe + Sized> Future for FFIFuture<T> {
 
     // 2. The "Fingerprint" Check
     // This is essentially what will_wake does, but without the function call.
-    if unsafe { *self.last_waker_data.get() != data_ptr }
-      || unsafe { *self.last_waker_vtable.get() != vtable_ptr }
-    {
-      compiler_fence(Ordering::SeqCst);
-
-      unsafe {
-        *self.last_waker_data.get() = data_ptr;
-        *self.last_waker_vtable.get() = vtable_ptr;
+    if { self.last_waker_data.load(Ordering::Relaxed) != data_ptr.addr() } || {
+      self.last_waker_vtable.load(Ordering::Relaxed) != vtable_ptr.addr()
+    } {
+      {
+        self
+          .last_waker_data
+          .store(data_ptr.addr(), Ordering::Relaxed);
+        self
+          .last_waker_vtable
+          .store(vtable_ptr.addr(), Ordering::Relaxed);
       }
 
-      compiler_fence(Ordering::SeqCst);
+      let new_internal = ManuallyDrop::new(waker.clone());
 
-      let new_internal = ManuallyDrop::new(CWakerInternal {
-        waker: waker.clone(),
-      });
-
-      let cwaker = unsafe { ptr::read(addr_of!(new_internal) as *const _ as *const CWaker) };
-
-      (self.task._cb)(self.task._state, CBReason::Waker { waker: cwaker });
+      (self.task._cb)(
+        self.task._state,
+        CBReason::Waker {
+          waker: CWaker {
+            data: new_internal.data(),
+            vtable: new_internal.vtable() as *const _ as _,
+          },
+        },
+      );
     }
 
     let out = (self.task._cb)(self.task._state, CBReason::PollCollect {});

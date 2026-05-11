@@ -10,7 +10,10 @@ use std::num::NonZero;
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
 
-use crate::FFISafe;
+use crate::{
+  FFISafe,
+  I_DECLARE_THAT_I_AND_MY_CODEBASE_IS_FFI_SAFE_AND_THAT_UNDEFINED_BEHAVIOUR_ARISING_DUE_TO_DECLARING_MY_TYPES_FFI_SAFE_DOES_NOT_CONDONE_THE_SAFETY_AND_SECURITY_OF_THIS_PROJECT,
+};
 
 #[repr(C)]
 pub struct VectorHeaderVTable<T: FFISafe + Sized> {
@@ -38,7 +41,11 @@ pub struct Vector<T: FFISafe + Sized> {
   ptr: NonNull<T>,
 }
 
-unsafe impl<T: FFISafe + Sized> FFISafe for Vector<T> {}
+unsafe impl<T: FFISafe + Sized> FFISafe for Vector<T> {
+  fn i_am_ffisafe() -> crate::IAmFFISafe {
+    I_DECLARE_THAT_I_AND_MY_CODEBASE_IS_FFI_SAFE_AND_THAT_UNDEFINED_BEHAVIOUR_ARISING_DUE_TO_DECLARING_MY_TYPES_FFI_SAFE_DOES_NOT_CONDONE_THE_SAFETY_AND_SECURITY_OF_THIS_PROJECT
+  }
+}
 
 const fn calc<T: FFISafe + Sized>(count: NonZeroUsize) -> usize {
   ((count.get() - 1) * size_of::<T>()) + size_of::<VectorHeaderVTable<T>>()

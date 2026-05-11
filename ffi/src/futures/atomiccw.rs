@@ -60,7 +60,7 @@ impl AtomicFFICWaker {
   }
 
   unsafe fn drop(&self) {
-    unsafe { (self.vtable.free_waker)((&*self.data.get()).unsafe_bitcopy()) };
+    unsafe { (self.vtable.free_waker)(*self.data.get()) };
   }
 
   pub fn set_vtable(&mut self, vtable: *const WakerVTable) {
@@ -116,7 +116,7 @@ impl AtomicFFICWaker {
 
     unsafe {
       if current_state & (NEW) == 0 {
-        let d = (*self.data.get()).unsafe_bitcopy();
+        let d = *self.data.get();
         (self.vtable.wake_no_free)(d);
       }
     }
@@ -164,7 +164,7 @@ impl AtomicFFICWaker {
     let old_data = unsafe {
       // 2. Swap the data.
       // Since we hold bit 63, no 'wake()' will touch this right now.
-      std::ptr::replace(self.data.get(), new_data.unsafe_bitcopy())
+      std::ptr::replace(self.data.get(), new_data)
     };
     // END CRITICAL
 
@@ -177,13 +177,13 @@ impl AtomicFFICWaker {
     // 4. If someone tried to wake us while we were swapping...
     if (prev & NOTIFIED) != 0 {
       // ...we do the work they skipped.
-      unsafe { (self.vtable.wake_no_free)(new_data.unsafe_bitcopy()) };
+      unsafe { (self.vtable.wake_no_free)(new_data) };
     }
 
     // 5. Cleanup the old data
     // We ensure NEW bit is not set
     if prev & NEW == 0 {
-      (self.vtable.free_waker)(old_data);
+      unsafe { (self.vtable.free_waker)(old_data) };
     }
   }
 }

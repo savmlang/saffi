@@ -71,7 +71,7 @@ jobs:
           targets: ${{ matrix.triple.target }}
 
       - name: Build salloc
-        working-directory: libsalloc/allocator
+        working-directory: libsalloc
         run: |
           cargo build --release
 
@@ -79,7 +79,7 @@ jobs:
         working-directory: members/benchmarks
         shell: pwsh
         env:
-          LD_LIBRARY_PATH: ${{ github.workspace }}/cache/benchmarks/release:${{ github.workspace }}/libsalloc/allocator/target/release
+          LD_LIBRARY_PATH: ${{ github.workspace }}/cache/benchmarks/release:${{ github.workspace }}/libsalloc/target/release
         run: |
           $separator = [System.IO.Path]::PathSeparator
 
@@ -90,6 +90,6 @@ jobs:
           cd ..
 
           $env:Path += "$separator" + "$(Resolve-Path ../../cache/benchmarks/release)"
-          $env:Path += "$separator" + "$(Resolve-Path ../../libsalloc/allocator/target/release)"
+          $env:Path += "$separator" + "$(Resolve-Path ../../libsalloc/target/release)"
 
           cargo bench
