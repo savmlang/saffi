@@ -95,10 +95,10 @@ impl<T: FFISafe + Sized> Vector<T> {
   #[inline(always)]
   fn set_len(&mut self, len: usize) {
     unsafe {
-      let nnull: *mut VectorHeaderVTable<T> =
+      let header_ptr: *mut VectorHeaderVTable<T> =
         self.ptr.as_ptr().byte_offset(header_offset::<T>()) as _;
 
-      (&mut *nnull).len = len;
+      (&mut *header_ptr).len = len;
     }
   }
 
