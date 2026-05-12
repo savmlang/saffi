@@ -247,11 +247,11 @@ impl<T: FFISafe + Sized> Vector<T> {
     known_cap: Option<usize>,
     value: [T; N],
   ) {
-    let len = known_len.unwrap_or(self.len());
-
     if N == 0 {
       return;
     }
+
+    let len = known_len.unwrap_or(self.len());
 
     self.allocate(known_cap, unsafe { NonZeroUsize::new_unchecked(len + N) });
 
