@@ -73,7 +73,7 @@ jobs:
       - name: Build salloc
         working-directory: libsalloc
         run: |
-          cargo build --release
+          cargo build --release --config 'profile.release.panic="abort"'
 
       - name: Run benchmarks
         working-directory: members/benchmarks

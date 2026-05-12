@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf, process::Command};
+use std::{env, path::PathBuf};
 
 fn main() {
   let mut project_root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
@@ -7,7 +7,6 @@ fn main() {
 
   let mut rt = project_root.clone();
   rt.push("libsalloc");
-  rt.push("allocator");
   let common_targets = rt.to_str().expect("Unable to build deps");
 
   // Point to the workspace target directory where the dylib files are generated
