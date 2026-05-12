@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf, process::Command};
+use std::{env, path::PathBuf};
 
 fn main() {
   let mut project_root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
