@@ -95,10 +95,10 @@ impl<T: FFISafe + Sized> Vector<T> {
   #[inline(always)]
   fn set_len(&mut self, len: usize) {
     unsafe {
-      let nnull: *mut VectorHeaderVTable<T> =
+      let header_ptr: *mut VectorHeaderVTable<T> =
         self.ptr.as_ptr().byte_offset(header_offset::<T>()) as _;
 
-      (&mut *nnull).len = len;
+      (&mut *header_ptr).len = len;
     }
   }
 
@@ -247,6 +247,10 @@ impl<T: FFISafe + Sized> Vector<T> {
     known_cap: Option<usize>,
     value: [T; N],
   ) {
+    if N == 0 {
+      return;
+    }
+
     let len = known_len.unwrap_or(self.len());
 
     self.allocate(known_cap, unsafe { NonZeroUsize::new_unchecked(len + N) });
@@ -280,17 +284,20 @@ impl<T: FFISafe + Sized> Vector<T> {
     T: Copy,
   {
     let len = known_len.unwrap_or(self.len());
+    let new_len = len + value.len();
 
-    self.allocate(known_cap, unsafe {
-      NonZeroUsize::new_unchecked(len + value.len())
-    });
+    if new_len == 0 {
+      return;
+    }
+
+    self.allocate(known_cap, unsafe { NonZeroUsize::new_unchecked(new_len) });
 
     unsafe {
       let dst = self.ptr.as_ptr().add(len);
 
       ptr::copy_nonoverlapping(value.as_ptr(), dst, value.len());
 
-      self.set_len(len + value.len());
+      self.set_len(new_len);
     }
   }
 
