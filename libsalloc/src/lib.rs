@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), no_std)]
+#![cfg_attr(not(any(debug_assertions, all(target_os = "linux", target_arch = "arm"))), no_std)]
 
 use core::ffi::{c_int, c_void};
 use libmimalloc_sys::{mi_free, mi_malloc_aligned, mi_realloc_aligned, mi_zalloc_aligned};
@@ -32,7 +32,7 @@ unsafe extern "C" {
   pub fn exit(status: c_int) -> !;
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(any(debug_assertions, all(target_os = "linux", target_arch = "arm"))))]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
   unsafe { exit(1) };
