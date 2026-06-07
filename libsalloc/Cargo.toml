@@ -9,7 +9,6 @@ license = "Apache-2.0"
 crate-type = ["cdylib"]
 
 [dependencies]
-libmimalloc-sys = { version = "0.1", features = [
-  "v3",
+libmimalloc-sys = { version = "^0.1", features = [
   "arena",
 ], default-features = false }
