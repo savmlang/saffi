@@ -55,25 +55,6 @@ pub extern "C" fn unregister(id: u8, f: Fn) {
   }
 }
 
-#[cfg(target_os = "linux")]
-#[unsafe(link_section = ".fini_array")]
-pub static DESTROY_FN: extern "C" fn() = _cleanup_fn;
-
-#[cfg(target_os = "macos")]
-#[unsafe(link_section = "__DATA,__mod_term_func")]
-pub static DESTROY_FN: extern "C" fn() = _cleanup_fn;
-
-static SHUTDOWN: AtomicBool = AtomicBool::new(false);
-static SLICER_DEAD: AtomicBool = AtomicBool::new(false);
-
-extern "C" fn _cleanup_fn() {
-  SHUTDOWN.store(true, Ordering::Release);
-
-  while !SLICER_DEAD.load(Ordering::Acquire) {
-    spin_loop();
-  }
-}
-
 #[unsafe(no_mangle)]
 pub extern "C" fn init() {
   SLICER.get_or_init(|| {
@@ -86,11 +67,6 @@ pub extern "C" fn init() {
         .unwrap();
 
       loop {
-        if SHUTDOWN.load(Ordering::Acquire) {
-          SLICER_DEAD.store(true, Ordering::Release);
-          break;
-        }
-
         let mut executed_work = false;
 
         let dirty = AtomicBool::new(false);
