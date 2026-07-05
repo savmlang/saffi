@@ -5,13 +5,16 @@ fn main() {
 
   project_root.push("../../..");
 
-  let mut rt = project_root.clone();
-  rt.push("libsalloc");
+  let rt = project_root.clone();
   let common_targets = rt.to_str().expect("Unable to build deps");
 
   // Point to the workspace target directory where the dylib files are generated
   println!(
-    "cargo:rustc-link-search=native={}/target/release",
+    "cargo:rustc-link-search=native={}/libsalloc/target/release",
+    common_targets
+  );
+  println!(
+    "cargo:rustc-link-search=native={}/libsavmasync/target/release",
     common_targets
   );
 }

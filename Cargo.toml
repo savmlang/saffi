@@ -4,5 +4,6 @@ members = [
   "members/loomtests",
   "members/benchmarks",
   "members/benchmarks/asyncs",
+  "smolasyncio",
 ]
-exclude = ["ffi", "salloc", "libsalloc"]
+exclude = ["ffi", "salloc", "libsalloc", "libsavmasync", "savmasync"]

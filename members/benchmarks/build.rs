@@ -38,4 +38,8 @@ fn main() {
     "cargo:rustc-link-search=native={}/../../libsalloc/target/release",
     common_targets
   );
+  println!(
+    "cargo:rustc-link-search=native={}/../../libsavmasync/target/release",
+    common_targets
+  );
 }

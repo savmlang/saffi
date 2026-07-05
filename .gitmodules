@@ -1,0 +1,3 @@
+[submodule "smolasyncio"]
+	path = smolasyncio
+	url = https://github.com/savmlang/smol-asyncio

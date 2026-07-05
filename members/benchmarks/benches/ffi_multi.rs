@@ -1,8 +1,10 @@
 use benchmarks::{Instruction, RT_MUL};
 use futures::{StreamExt, stream::FuturesUnordered};
-use saffi::futures::FFIFuture;
+use saffi::{futures::FFIFuture, savmasync};
 
 fn main() {
+  savmasync::init();
+
   // Run registered benchmarks.
   divan::main();
 }

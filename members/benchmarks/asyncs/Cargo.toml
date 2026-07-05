@@ -10,3 +10,7 @@ crate-type = ["cdylib"]
 [dependencies]
 saffi = { path = "../../../ffi" }
 smol = "2.0.2"
+async-io = { path = "../../../smolasyncio" }
+
+[patch.crates-io]
+async-io = { path = "../../../smolasyncio" }

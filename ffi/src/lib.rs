@@ -6,6 +6,7 @@ pub mod string;
 pub mod vector;
 
 pub use salloc;
+pub use savmasync;
 
 #[doc(hidden)]
 pub struct IAmFFISafe(());

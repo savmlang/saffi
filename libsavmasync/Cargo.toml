@@ -1,0 +1,15 @@
+[package]
+name = "savmasync"
+version = "0.0.0"                                                         # This does not define the version
+edition = "2024"
+description = "Async Allocator to be used in the Sa Programming Language"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+dashmap = { version = "^6", features = ["rayon"] }
+parking_lot = "^0.12"
+rapidhash = "^4"
+rayon = "^1"

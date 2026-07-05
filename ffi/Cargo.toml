@@ -6,4 +6,7 @@ license = "Apache-2.0"
 
 [dependencies]
 salloc = { package = "salloc-sys", path = "../salloc" }
+savmasync = { package = "savmasync-sys", path = "../savmasync" }
+
+[dev-dependencies]
 tokio = { version = "^1", features = ["rt", "sync", "time", "macros"] }
