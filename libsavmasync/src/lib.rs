@@ -67,6 +67,23 @@ pub extern "C" fn init() {
         .unwrap();
 
       loop {
+        #[cfg(unix)]
+        unsafe {
+          let mut buf = [0u8; 1];
+          // Check pipe descriptor in non-blocking mode
+          let res = libc::recv(
+            PIPE_FD,
+            buf.as_mut_ptr() as *mut libc::c_void,
+            1,
+            libc::MSG_DONTWAIT,
+          );
+
+          if res == 0 {
+            // EOF reached! The host process has closed or died. Exit immediately.
+            break;
+          }
+        }
+
         let mut executed_work = false;
 
         let dirty = AtomicBool::new(false);
