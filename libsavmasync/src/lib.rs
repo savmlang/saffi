@@ -55,6 +55,20 @@ pub extern "C" fn unregister(id: u8, f: Fn) {
   }
 }
 
+#[cfg(target_os = "linux")]
+#[unsafe(link_section = ".fini_array")]
+pub static DESTROY_FN: extern "C" fn() = _cleanup_fn;
+
+#[cfg(target_os = "macos")]
+#[unsafe(link_section = "__DATA,__mod_term_func")]
+pub static DESTROY_FN: extern "C" fn() = _cleanup_fn;
+
+static SHUTDOWN: AtomicBool = AtomicBool::new(false);
+
+extern "C" fn _cleanup_fn() {
+  SHUTDOWN.store(true, Ordering::Release);
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn init() {
   SLICER.get_or_init(|| {
@@ -67,21 +81,8 @@ pub extern "C" fn init() {
         .unwrap();
 
       loop {
-        #[cfg(unix)]
-        unsafe {
-          let mut buf = [0u8; 1];
-          // Check pipe descriptor in non-blocking mode
-          let res = libc::recv(
-            PIPE_FD,
-            buf.as_mut_ptr() as *mut libc::c_void,
-            1,
-            libc::MSG_DONTWAIT,
-          );
-
-          if res == 0 {
-            // EOF reached! The host process has closed or died. Exit immediately.
-            break;
-          }
+        if SHUTDOWN.load(Ordering::Acquire) {
+          break;
         }
 
         let mut executed_work = false;
