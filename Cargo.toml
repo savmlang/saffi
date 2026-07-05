@@ -7,3 +7,6 @@ members = [
   "smolasyncio",
 ]
 exclude = ["ffi", "salloc", "libsalloc", "libsavmasync", "savmasync"]
+
+[patch.crates-io]
+async-io = { path = "../../../smolasyncio" }
