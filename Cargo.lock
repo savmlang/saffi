@@ -89,24 +89,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-io"
-version = "2.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "456b8a8feb6f42d237746d4b3e9a178494627745c3c56c6ea55d92ba50d026fc"
-dependencies = [
- "autocfg",
- "cfg-if",
- "concurrent-queue",
- "futures-io",
- "futures-lite",
- "parking",
- "polling",
- "rustix 1.1.4",
- "slab",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "async-lock"
 version = "3.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -123,7 +105,7 @@ version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b948000fad4873c1c9339d60f2623323a0cfd3816e5181033c6a5cb68b2accf7"
 dependencies = [
- "async-io 2.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "async-io",
  "blocking",
  "futures-lite",
 ]
@@ -135,7 +117,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc50921ec0055cdd8a16de48773bfeec5c972598674347252c0399676be7da75"
 dependencies = [
  "async-channel",
- "async-io 2.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "async-io",
  "async-lock",
  "async-signal",
  "async-task",
@@ -152,7 +134,7 @@ version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52b5aaafa020cf5053a01f2a60e8ff5dccf550f0f77ec54a4e47285ac2bab485"
 dependencies = [
- "async-io 2.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "async-io",
  "async-lock",
  "atomic-waker",
  "cfg-if",
@@ -174,7 +156,7 @@ checksum = "8b75356056920673b02621b35afd0f7dda9306d03c79a30f5c56c44cf256e3de"
 name = "asyncs"
 version = "0.1.0"
 dependencies = [
- "async-io 2.6.0",
+ "async-io",
  "saffi",
  "smol",
 ]
@@ -1015,7 +997,7 @@ dependencies = [
  "async-channel",
  "async-executor",
  "async-fs",
- "async-io 2.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "async-io",
  "async-lock",
  "async-net",
  "async-process",

@@ -4,19 +4,11 @@ version = "0.0.0"
 edition = "2024"
 
 [[bench]]
-name = "tokio_multi"
+name = "ffi"
 harness = false
 
 [[bench]]
-name = "ffi_multi"
-harness = false
-
-[[bench]]
-name = "tokio_single"
-harness = false
-
-[[bench]]
-name = "ffi_single"
+name = "tokio"
 harness = false
 
 [dependencies]
