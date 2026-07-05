@@ -31,7 +31,7 @@ fn flood(id: Instruction) {
       Instruction::Sleep100ms => {
         for _ in 0..5_000 {
           {
-            tasks.push(FFIFuture::new(benchmarks::asyncfn::none()));
+            tasks.push(FFIFuture::new(benchmarks::asyncfn::sleep100ms()));
           }
         }
       }

@@ -64,9 +64,14 @@ pub static DESTROY_FN: extern "C" fn() = _cleanup_fn;
 pub static DESTROY_FN: extern "C" fn() = _cleanup_fn;
 
 static SHUTDOWN: AtomicBool = AtomicBool::new(false);
+static SLICER_DEAD: AtomicBool = AtomicBool::new(false);
 
 extern "C" fn _cleanup_fn() {
   SHUTDOWN.store(true, Ordering::Release);
+
+  while !SLICER_DEAD.load(Ordering::Acquire) {
+    spin_loop();
+  }
 }
 
 #[unsafe(no_mangle)]
@@ -82,6 +87,7 @@ pub extern "C" fn init() {
 
       loop {
         if SHUTDOWN.load(Ordering::Acquire) {
+          SLICER_DEAD.store(true, Ordering::Release);
           break;
         }
 
