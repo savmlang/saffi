@@ -79,11 +79,16 @@ jobs:
         run: |
           cargo build --release --config 'profile.release.panic="abort"'
 
+      - name: Build savmasync
+        working-directory: libsavmasync
+        run: |
+          cargo build --release
+
       - name: Run benchmarks
         working-directory: members/benchmarks
         shell: pwsh
         env:
-          LD_LIBRARY_PATH: ${{ github.workspace }}/cache/benchmarks/release:${{ github.workspace }}/libsalloc/target/release
+          LD_LIBRARY_PATH: ${{ github.workspace }}/cache/benchmarks/release:${{ github.workspace }}/libsalloc/target/release:${{ github.workspace }}/libsavmasync/target/release
         run: |
           $separator = [System.IO.Path]::PathSeparator
 
@@ -95,5 +100,6 @@ jobs:
 
           $env:Path += "$separator" + "$(Resolve-Path ../../cache/benchmarks/release)"
           $env:Path += "$separator" + "$(Resolve-Path ../../libsalloc/target/release)"
+          $env:Path += "$separator" + "$(Resolve-Path ../../libsavmasync/target/release)"
 
           cargo bench
