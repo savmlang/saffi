@@ -67,7 +67,7 @@ macro_rules! generate {
     pub extern "system" fn DllMain(
       _hinst_dll: *mut std::ffi::c_void,
       fdw_reason: u32,
-      lp_reserved: *mut std::ffi::c_void,
+      _lp_reserved: *mut std::ffi::c_void,
     ) -> i32 {
       const DLL_PROCESS_ATTACH: u32 = 1;
       const DLL_PROCESS_DETACH: u32 = 0;
@@ -75,9 +75,7 @@ macro_rules! generate {
       if fdw_reason == DLL_PROCESS_ATTACH {
         setup_fn();
       } else if fdw_reason == DLL_PROCESS_DETACH {
-        if (!lp_reserved.is_null()) {
-          cleanup_fn();
-        }
+        cleanup_fn();
       }
       1 // Success
     }
