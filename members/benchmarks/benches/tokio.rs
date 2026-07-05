@@ -9,7 +9,7 @@ fn main() {
   divan::main();
 }
 
-#[divan::bench(args = [Instruction::None, Instruction::Sleep100ms])]
+#[divan::bench(args = [Instruction::None, Instruction::Sleep100ms], sample_size = 100)]
 fn single(id: Instruction) {
   match id {
     Instruction::None => RT_MUL.block_on(benchmarks::none()),
@@ -17,13 +17,13 @@ fn single(id: Instruction) {
   };
 }
 
-#[divan::bench(args = [Instruction::None, Instruction::Sleep100ms])]
+#[divan::bench(args = [Instruction::None, Instruction::Sleep100ms], sample_size = 100)]
 fn multi(id: Instruction) {
   RT_MUL.block_on(async {
     match id {
       Instruction::None => {
         let mut tasks = FuturesUnordered::new();
-        for _ in 0..20_000 {
+        for _ in 0..5_000 {
           tasks.push(benchmarks::none());
         }
 
