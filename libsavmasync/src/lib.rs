@@ -71,6 +71,7 @@ pub extern "C" fn init() {
 
         let dirty = AtomicBool::new(false);
         if let Some(space) = SPACE.try_read() {
+          println!("Entering pool");
           executed_work = pool.install(|| {
             space
               .par_iter()
@@ -84,9 +85,11 @@ pub extern "C" fn init() {
               })
               .reduce(|| false, |a, b| a || b)
           });
+          println!("Exiting pool");
         }
 
         if dirty.load(Ordering::Acquire) {
+          println!("Cleaning space");
           SPACE.write().retain(|x| x.0.load(Ordering::Acquire));
         }
 
