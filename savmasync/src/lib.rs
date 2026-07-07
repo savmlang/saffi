@@ -43,45 +43,46 @@ macro_rules! generate {
       };
     )*
 
-    // Linux
-    #[cfg(target_os = "linux")]
-    #[unsafe(link_section = ".init_array")]
-    pub static INIT_FN: extern "C" fn() = setup_fn;
+    // // Linux
+    // #[cfg(target_os = "linux")]
+    // #[unsafe(link_section = ".init_array")]
+    // pub static INIT_FN: extern "C" fn() = setup_fn;
 
-    #[cfg(target_os = "linux")]
-    #[unsafe(link_section = ".fini_array")]
-    pub static DESTROY_FN: extern "C" fn() = cleanup_fn;
+    // #[cfg(target_os = "linux")]
+    // #[unsafe(link_section = ".fini_array")]
+    // pub static DESTROY_FN: extern "C" fn() = cleanup_fn;
 
-    // macOS
-    #[cfg(target_os = "macos")]
-    #[unsafe(link_section = "__DATA,__mod_init_func")]
-    pub static INIT_FN: extern "C" fn() = setup_fn;
+    // // macOS
+    // #[cfg(target_os = "macos")]
+    // #[unsafe(link_section = "__DATA,__mod_init_func")]
+    // pub static INIT_FN: extern "C" fn() = setup_fn;
 
-    #[cfg(target_os = "macos")]
-    #[unsafe(link_section = "__DATA,__mod_term_func")]
-    pub static DESTROY_FN: extern "C" fn() = cleanup_fn;
+    // #[cfg(target_os = "macos")]
+    // #[unsafe(link_section = "__DATA,__mod_term_func")]
+    // pub static DESTROY_FN: extern "C" fn() = cleanup_fn;
 
-    // Windows
-    #[cfg(target_os = "windows")]
-    #[unsafe(no_mangle)]
-    pub extern "system" fn DllMain(
-      _hinst_dll: *mut std::ffi::c_void,
-      fdw_reason: u32,
-      _lp_reserved: *mut std::ffi::c_void,
-    ) -> i32 {
-      const DLL_PROCESS_ATTACH: u32 = 1;
-      const DLL_PROCESS_DETACH: u32 = 0;
+    // // Windows
+    // #[cfg(target_os = "windows")]
+    // #[unsafe(no_mangle)]
+    // pub extern "system" fn DllMain(
+    //   _hinst_dll: *mut std::ffi::c_void,
+    //   fdw_reason: u32,
+    //   _lp_reserved: *mut std::ffi::c_void,
+    // ) -> i32 {
+    //   const DLL_PROCESS_ATTACH: u32 = 1;
+    //   const DLL_PROCESS_DETACH: u32 = 0;
 
-      if fdw_reason == DLL_PROCESS_ATTACH {
-        setup_fn();
-      } else if fdw_reason == DLL_PROCESS_DETACH {
-        cleanup_fn();
-      }
-      1 // Success
-    }
+    //   if fdw_reason == DLL_PROCESS_ATTACH {
+    //     setup_fn();
+    //   } else if fdw_reason == DLL_PROCESS_DETACH {
+    //     cleanup_fn();
+    //   }
+    //   1 // Success
+    // }
 
     // Called automatically when library maps into memory
-    extern "C" fn setup_fn() {
+    #[unsafe(no_mangle)]
+    pub extern "C" fn setup_fn() {
       unsafe {
         $(
           $instance.register();
@@ -90,7 +91,8 @@ macro_rules! generate {
     }
 
     // Called automatically during dlclose/FreeLibrary
-    extern "C" fn cleanup_fn() {
+    #[unsafe(no_mangle)]
+    pub extern "C" fn cleanup_fn() {
       unsafe {
         $(
           let id = $instance.id();

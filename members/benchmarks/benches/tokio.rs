@@ -15,7 +15,7 @@ fn single(id: Instruction) {
 }
 
 #[divan::bench(args = [Instruction::None, Instruction::Sleep100ms], sample_size = 1)]
-fn multi(id: Instruction) {
+fn flood(id: Instruction) {
   RT_MUL.block_on(async {
     match id {
       Instruction::None => {

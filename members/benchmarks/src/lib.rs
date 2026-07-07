@@ -8,8 +8,8 @@ pub mod asyncfn {
   #[cfg_attr(windows, link(name = "asyncfn", kind = "raw-dylib"))]
   #[cfg_attr(not(windows), link(name = "asyncfn", kind = "dylib"))]
   unsafe extern "C" {
-    // pub safe fn setup_fn();
-    // pub safe fn cleanup_fn();
+    pub safe fn setup_fn();
+    pub safe fn cleanup_fn();
 
     pub safe fn none() -> FutureTask<u8>;
     pub safe fn sleep100ms() -> FutureTask<u8>;
