@@ -121,6 +121,7 @@ impl AtomicFFICWaker {
       }
     }
 
+    // Release is perfectly okay here since we do not read the state
     self
       .state
       .fetch_and(!(LOCKED | NOTIFIED), Ordering::Release);
@@ -172,7 +173,7 @@ impl AtomicFFICWaker {
     let prev = self
       .state
       // Remove LOCK, NOTIFIED, NEW
-      .fetch_and(!(LOCKED | NOTIFIED | NEW), Ordering::Release);
+      .fetch_and(!(LOCKED | NOTIFIED | NEW), Ordering::AcqRel);
 
     // 4. If someone tried to wake us while we were swapping...
     if (prev & NOTIFIED) != 0 {

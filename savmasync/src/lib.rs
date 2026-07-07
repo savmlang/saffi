@@ -43,44 +43,7 @@ macro_rules! generate {
       };
     )*
 
-    // // Linux
-    // #[cfg(target_os = "linux")]
-    // #[unsafe(link_section = ".init_array")]
-    // pub static INIT_FN: extern "C" fn() = setup_fn;
-
-    // #[cfg(target_os = "linux")]
-    // #[unsafe(link_section = ".fini_array")]
-    // pub static DESTROY_FN: extern "C" fn() = cleanup_fn;
-
-    // // macOS
-    // #[cfg(target_os = "macos")]
-    // #[unsafe(link_section = "__DATA,__mod_init_func")]
-    // pub static INIT_FN: extern "C" fn() = setup_fn;
-
-    // #[cfg(target_os = "macos")]
-    // #[unsafe(link_section = "__DATA,__mod_term_func")]
-    // pub static DESTROY_FN: extern "C" fn() = cleanup_fn;
-
-    // // Windows
-    // #[cfg(target_os = "windows")]
-    // #[unsafe(no_mangle)]
-    // pub extern "system" fn DllMain(
-    //   _hinst_dll: *mut std::ffi::c_void,
-    //   fdw_reason: u32,
-    //   _lp_reserved: *mut std::ffi::c_void,
-    // ) -> i32 {
-    //   const DLL_PROCESS_ATTACH: u32 = 1;
-    //   const DLL_PROCESS_DETACH: u32 = 0;
-
-    //   if fdw_reason == DLL_PROCESS_ATTACH {
-    //     setup_fn();
-    //   } else if fdw_reason == DLL_PROCESS_DETACH {
-    //     cleanup_fn();
-    //   }
-    //   1 // Success
-    // }
-
-    // Called automatically when library maps into memory
+    /// `setup_fn` is required to be used to set up the required SETUP things as per the norm!
     #[unsafe(no_mangle)]
     pub extern "C" fn setup_fn() {
       unsafe {
@@ -90,7 +53,8 @@ macro_rules! generate {
       }
     }
 
-    // Called automatically during dlclose/FreeLibrary
+    /// This function must be called to cleanup the registrations
+    /// made to savmasync.dll to prevent segmentation faults!
     #[unsafe(no_mangle)]
     pub extern "C" fn cleanup_fn() {
       unsafe {
@@ -103,3 +67,43 @@ macro_rules! generate {
     }
   };
 }
+
+// NOTES:
+// If anything can try to make these tricks work - it'd be appreciated
+//
+// // Linux
+// #[cfg(target_os = "linux")]
+// #[unsafe(link_section = ".init_array")]
+// pub static INIT_FN: extern "C" fn() = setup_fn;
+//
+// #[cfg(target_os = "linux")]
+// #[unsafe(link_section = ".fini_array")]
+// pub static DESTROY_FN: extern "C" fn() = cleanup_fn;
+//
+// // macOS
+// #[cfg(target_os = "macos")]
+// #[unsafe(link_section = "__DATA,__mod_init_func")]
+// pub static INIT_FN: extern "C" fn() = setup_fn;
+//
+// #[cfg(target_os = "macos")]
+// #[unsafe(link_section = "__DATA,__mod_term_func")]
+// pub static DESTROY_FN: extern "C" fn() = cleanup_fn;
+//
+// // Windows
+// #[cfg(target_os = "windows")]
+// #[unsafe(no_mangle)]
+// pub extern "system" fn DllMain(
+//   _hinst_dll: *mut std::ffi::c_void,
+//   fdw_reason: u32,
+//   _lp_reserved: *mut std::ffi::c_void,
+// ) -> i32 {
+//   const DLL_PROCESS_ATTACH: u32 = 1;
+//   const DLL_PROCESS_DETACH: u32 = 0;
+
+//   if fdw_reason == DLL_PROCESS_ATTACH {
+//     setup_fn();
+//   } else if fdw_reason == DLL_PROCESS_DETACH {
+//     cleanup_fn();
+//   }
+//   1 // Success
+// }
