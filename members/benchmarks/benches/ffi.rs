@@ -29,12 +29,12 @@ fn flood(id: Instruction) {
 
     match id {
       Instruction::None => {
-        for _ in 0..5_000 {
+        for _ in 0..50_000 {
           tasks.push(FFIFuture::new(benchmarks::asyncfn::none()));
         }
       }
       Instruction::Sleep100ms => {
-        for _ in 0..5_000 {
+        for _ in 0..50_000 {
           {
             tasks.push(FFIFuture::new(benchmarks::asyncfn::sleep100ms()));
           }

@@ -20,7 +20,7 @@ fn flood(id: Instruction) {
     match id {
       Instruction::None => {
         let mut tasks = FuturesUnordered::new();
-        for _ in 0..5_000 {
+        for _ in 0..50_000 {
           tasks.push(benchmarks::none());
         }
 
@@ -28,7 +28,7 @@ fn flood(id: Instruction) {
       }
       Instruction::Sleep100ms => {
         let mut tasks = FuturesUnordered::new();
-        for _ in 0..5_000 {
+        for _ in 0..50_000 {
           tasks.push(benchmarks::sleep100ms());
         }
 
