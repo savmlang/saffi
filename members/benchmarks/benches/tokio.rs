@@ -1,15 +1,12 @@
 use benchmarks::{Instruction, RT_MUL};
 use futures::{StreamExt, stream::FuturesUnordered};
-use saffi::savmasync;
 
 fn main() {
-  savmasync::init();
-
   // Run registered benchmarks.
   divan::main();
 }
 
-#[divan::bench(args = [Instruction::None, Instruction::Sleep100ms], sample_size = 100)]
+#[divan::bench(args = [Instruction::None, Instruction::Sleep100ms], sample_size = 1)]
 fn single(id: Instruction) {
   match id {
     Instruction::None => RT_MUL.block_on(benchmarks::none()),
@@ -17,7 +14,7 @@ fn single(id: Instruction) {
   };
 }
 
-#[divan::bench(args = [Instruction::None, Instruction::Sleep100ms], sample_size = 100)]
+#[divan::bench(args = [Instruction::None, Instruction::Sleep100ms], sample_size = 1)]
 fn multi(id: Instruction) {
   RT_MUL.block_on(async {
     match id {

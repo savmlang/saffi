@@ -48,18 +48,18 @@ macro_rules! generate {
     #[unsafe(link_section = ".init_array")]
     pub static INIT_FN: extern "C" fn() = setup_fn;
 
-    // #[cfg(target_os = "linux")]
-    // #[unsafe(link_section = ".fini_array")]
-    // pub static DESTROY_FN: extern "C" fn() = cleanup_fn;
+    #[cfg(target_os = "linux")]
+    #[unsafe(link_section = ".fini_array")]
+    pub static DESTROY_FN: extern "C" fn() = cleanup_fn;
 
     // macOS
     #[cfg(target_os = "macos")]
     #[unsafe(link_section = "__DATA,__mod_init_func")]
     pub static INIT_FN: extern "C" fn() = setup_fn;
 
-    // #[cfg(target_os = "macos")]
-    // #[unsafe(link_section = "__DATA,__mod_term_func")]
-    // pub static DESTROY_FN: extern "C" fn() = cleanup_fn;
+    #[cfg(target_os = "macos")]
+    #[unsafe(link_section = "__DATA,__mod_term_func")]
+    pub static DESTROY_FN: extern "C" fn() = cleanup_fn;
 
     // Windows
     #[cfg(target_os = "windows")]
