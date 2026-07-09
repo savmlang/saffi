@@ -189,16 +189,16 @@ impl<T: FFISafe + Sized> Future for FFIFuture<T> {
 
     // 2. The "Fingerprint" Check
     // This is essentially what will_wake does, but without the function call.
-    if { self.last_waker_data.load(Ordering::Relaxed) != data_ptr.addr() } || {
-      self.last_waker_vtable.load(Ordering::Relaxed) != vtable_ptr.addr()
+    if { self.last_waker_data.load(Ordering::Acquire) != data_ptr.addr() } || {
+      self.last_waker_vtable.load(Ordering::Acquire) != vtable_ptr.addr()
     } {
       {
         self
           .last_waker_data
-          .store(data_ptr.addr(), Ordering::Relaxed);
+          .store(data_ptr.addr(), Ordering::Release);
         self
           .last_waker_vtable
-          .store(vtable_ptr.addr(), Ordering::Relaxed);
+          .store(vtable_ptr.addr(), Ordering::Release);
       }
 
       let new_internal = ManuallyDrop::new(waker.clone());

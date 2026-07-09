@@ -36,8 +36,6 @@ impl<F: Future> FutureState<F> {
   );
 
   // Literally a zero-operation
-  //
-  // Clones the Arc and hands it over to them!
   unsafe fn clone_waker(state_ptr: *const ()) -> RawWaker {
     // Since the AtomicFFICWaker is inlined, we just pass the pointer.
     // If you need ref-counting for the Task itself, increment it here.
