@@ -57,6 +57,11 @@ pub extern "C" fn init() {
             .map(|v| {
               let fptr = v.fnptr.load(Ordering::Acquire);
 
+              // Sanity Pass
+              if fptr.is_null() {
+                return false;
+              }
+
               unsafe { transmute::<_, Fn>(fptr)() }
             })
             .reduce(|| false, |a, b| a || b)
