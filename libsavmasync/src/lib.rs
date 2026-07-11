@@ -1,64 +1,47 @@
-use parking_lot::RwLock;
-use rapidhash::fast::RandomState;
 use rayon::{
   ThreadPoolBuilder,
   iter::{IntoParallelRefIterator, ParallelIterator},
 };
 use std::{
-  collections::HashSet,
-  hash::Hash,
   hint::spin_loop,
-  ptr::fn_addr_eq,
-  sync::{
-    LazyLock, OnceLock,
-    atomic::{AtomicBool, Ordering},
-  },
-  thread::{self, available_parallelism, sleep},
+  mem::transmute,
+  sync::{LazyLock, OnceLock, atomic::Ordering},
+  thread::{self, Thread, available_parallelism},
   time::Duration,
 };
 
-static SPACE: LazyLock<RwLock<HashSet<Key, RandomState>>> =
-  LazyLock::new(|| RwLock::new(HashSet::with_capacity_and_hasher(32, RandomState::new())));
-static SLICER: OnceLock<()> = OnceLock::new();
+use crate::space::Registrations;
+
+pub(crate) mod space;
+
+static SPACE: LazyLock<Registrations> = LazyLock::new(|| Registrations::new_init());
+static SLICER: OnceLock<Thread> = OnceLock::new();
 
 pub type Fn = extern "C" fn() -> bool;
-
-pub struct Key(AtomicBool, u8, Fn);
-
-impl Hash for Key {
-  fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-    (self.1, self.2).hash(state);
-  }
-}
-impl PartialEq for Key {
-  fn eq(&self, other: &Self) -> bool {
-    self.1 == other.1 && fn_addr_eq(self.2, other.2)
-  }
-}
-impl Eq for Key {}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn register(id: u8, f: Fn) {
   init();
 
-  SPACE.write().insert(Key(AtomicBool::new(true), id, f));
+  SPACE.write(id, f);
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn unregister(id: u8, f: Fn) {
-  if let Some(x) = SPACE
-    .read()
-    .iter()
-    .find(|&&Key(_, x, f_)| x == id && fn_addr_eq(f_, f))
-  {
-    x.0.store(false, Ordering::Release);
-  }
+  SPACE.remove(id, f);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn signal_init() {
+  let Some(x) = SLICER.get() else { return };
+
+  x.unpark();
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn init() {
   SLICER.get_or_init(|| {
-    thread::spawn(|| {
+    let t = thread::spawn(|| {
       let mut spins: u16 = 0;
 
       let pool = ThreadPoolBuilder::new()
@@ -67,28 +50,19 @@ pub extern "C" fn init() {
         .unwrap();
 
       loop {
-        let mut executed_work = false;
+        let guard = (&*SPACE).get();
+        let executed_work = pool.install(|| {
+          guard
+            .par_iter()
+            .map(|v| {
+              let fptr = v.fnptr.load(Ordering::Acquire);
 
-        let dirty = AtomicBool::new(false);
-        if let Some(space) = SPACE.try_read() {
-          executed_work = pool.install(|| {
-            space
-              .par_iter()
-              .map(|v| {
-                if v.0.load(Ordering::Acquire) {
-                  (v.2)()
-                } else {
-                  dirty.store(true, Ordering::Release);
-                  false
-                }
-              })
-              .reduce(|| false, |a, b| a || b)
-          });
-        }
+              unsafe { transmute::<_, Fn>(fptr)() }
+            })
+            .reduce(|| false, |a, b| a || b)
+        });
 
-        if dirty.load(Ordering::Acquire) {
-          SPACE.write().retain(|x| x.0.load(Ordering::Acquire));
-        }
+        SPACE.try_gc();
 
         if executed_work {
           spins = 0;
@@ -99,11 +73,11 @@ pub extern "C" fn init() {
           thread::yield_now();
           spins = spins.saturating_add(1);
         } else {
-          sleep(Duration::from_millis(1));
+          thread::park_timeout(Duration::from_millis(1));
         }
       }
     });
 
-    ()
+    t.thread().clone()
   });
 }
