@@ -62,17 +62,23 @@ pub extern "C" fn init() {
             .reduce(|| false, |a, b| a || b)
         });
 
-        SPACE.try_gc();
-
         if executed_work {
           spins = 0;
+        } else if spins % 10 == 0 {
+          SPACE.try_gc();
+
+          spins = spins.saturating_add(1);
         } else if spins < 1000 {
           spin_loop();
+
           spins = spins.saturating_add(1);
         } else if spins < 1010 {
           thread::yield_now();
+
           spins = spins.saturating_add(1);
         } else {
+          SPACE.try_gc();
+
           thread::park_timeout(Duration::from_millis(1));
         }
       }
