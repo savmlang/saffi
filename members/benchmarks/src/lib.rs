@@ -26,6 +26,13 @@ pub async fn sleep100ms() -> u8 {
   0
 }
 
+pub async fn sleep100ms_smol() -> u8 {
+  use smol::Timer;
+  Timer::after(Duration::from_millis(100)).await;
+
+  0
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum Instruction {
   None,
