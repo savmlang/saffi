@@ -42,7 +42,8 @@ ffisafe! {
   i64,
   usize,
   isize,
-  c_void
+  c_void,
+  ()
 }
 
 unsafe impl<T> FFISafe for *const T {
